@@ -98,3 +98,28 @@ def test_ocr_numero_com_travessao_e_area_com_hifen_solto():
     # cabeçalho ilegível: o número vem dos próprios atos
     r2 = analisar_matricula(txt.replace("MATRÍCULANº — 99.001.-", "MATRÍCULA ilegível"))
     assert r2.numero == "99.001" and len(r2.atos) == 4
+
+
+def test_forma_pela_metragem():
+    lote = analisar_matricula(
+        "MATRÍCULA Nº 5.000. Data de terras nº 7 da quadra 3, com a área de 450,00 m², medindo 15,00 metros de frente "
+        "para a Rua das Flores; 30,00 metros de um lado, confrontando com a data 6; 30,00 metros do outro lado, "
+        "confrontando com a data 8; e 15,00 metros nos fundos, confrontando com a data 12."
+    )
+    assert [(m.lado, m.medida_m) for m in lote.medidas] == [("frente", 15), ("um lado", 30), ("outro lado", 30), ("fundos", 15)]
+    assert lote.forma["pontos_m"] == [[0, 0], [15, 0], [15, 30], [0, 30]] and lote.forma["orientacao"] == "rua"
+
+    irregular = analisar_matricula(
+        "MATRÍCULA 6.000. Lote 3 da quadra 9 com a área de 360,00 m², medindo 12,00 m de frente, 12,50 m nos fundos, "
+        "30,00 m do lado direito e 29,00 m do lado esquerdo."
+    ).forma
+    assert irregular["area_m2"] == pytest.approx(360, rel=0.01) and not irregular["avisos"]
+
+    prof = analisar_matricula("MATRÍCULA 7.000. Data 4 da quadra 2, área de 500,00 m², medindo 12,50 m de frente por 40,00 m da frente aos fundos.").forma
+    assert prof["pontos_m"][2] == [12.5, 40]
+
+    so_area = analisar_matricula((EX / "matricula_apartamento_ocr.txt").read_text(encoding="utf-8")).forma
+    assert so_area["area_m2"] == pytest.approx(800) and "quadrado" in so_area["fonte"]
+
+    com_coordenadas = analisar_matricula((EX / "matricula_gleba.txt").read_text(encoding="utf-8"))
+    assert com_coordenadas.forma is None  # já tem vértices georreferenciados

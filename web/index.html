@@ -639,7 +639,7 @@ function renderMatricula(r) {
       ${alertasHTML(r.alertas)}
       <table style="margin-top:8px">${id}</table>
       ${r.geojson ? `<button class="btn" id="mat-kml">Baixar KML (Google Earth)</button><button class="btn sec" id="mat-kmz">KMZ</button><button class="btn sec" id="mat-mp">Usar no masterplan</button>
-        <div style="margin-top:4px"><button class="btn sec" id="mat-sv">Street View</button><button class="btn sec" id="mat-car">CAR sobrepostos</button><button class="btn sec" id="mat-dren">Córregos próximos (IBGE)</button></div>`
+        <div style="margin-top:4px"><button class="btn sec" id="mat-sv">Street View</button><button class="btn sec" id="mat-car">CAR sobrepostos</button><button class="btn sec" id="mat-dren">Córregos próximos (IBGE)</button></div>${controlesPosicao(r)}`
         : `<div id="mat-local" style="margin-top:14px"></div>`}
     </div>
     <div id="mat-cruz"></div>
@@ -656,7 +656,7 @@ function renderMatricula(r) {
     const g = L.geoJSON(r.geojson, { style: { color: corMapa(), weight: 3, fillOpacity: .15 } }).addTo(camadaMat);
     r.geojson.geometry.coordinates[0].slice(0, -1).forEach((c, i) => L.circleMarker([c[1], c[0]], { radius: 4, color: "#fff", fillColor: corMapa(), fillOpacity: 1 })
       .bindTooltip(r.vertices[i]?.nome || "").addTo(camadaMat));
-    mapa.fitBounds(g.getBounds(), { padding: [30, 30] });
+    mapa.fitBounds(g.getBounds(), { padding: [40, 40], maxZoom: 19 });
     desenharMedidas(r.geojson.geometry.coordinates[0].slice(0, -1).map(c => [c[1], c[0]]), r.area_calculada_m2, camadaMat,
       r.segmentos.length === r.vertices.length ? r.segmentos.map(sg => sg.distancia_m) : null);
     const kml = async kmz => {
@@ -670,6 +670,7 @@ function renderMatricula(r) {
     $("#mat-sv").onclick = () => { const [la, lo] = centroMatricula(); window.open(`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${la},${lo}`, "_blank", "noopener"); };
     $("#mat-car").onclick = cruzarCAR;
     $("#mat-dren").onclick = buscarDrenagem;
+    ligarControlesPosicao(r);
     $("#zon-area").value = Math.round(r.area_calculada_m2 || r.area_declarada_m2 || 0);
   } else {
     iniciarLocalizacao(r);
@@ -688,7 +689,7 @@ function desenharMedidas(pts, area, camada, comprimentos = null) {
   });
   if (area && pts.length >= 3) {
     const centro = L.polygon(pts).getBounds().getCenter();
-    L.tooltip({ permanent: true, direction: "center", className: "medida medida-area" }).setLatLng(centro).setContent(`${fmt(area)} m²`).addTo(camada);
+    L.tooltip({ permanent: true, direction: "center", className: "medida medida-area", offset: [0, -26] }).setLatLng(centro).setContent(`${fmt(area)} m²`).addTo(camada);
   }
 }
 
@@ -721,6 +722,12 @@ async function iniciarLocalizacao(r) {
     const mk = L.marker([loc.lat, loc.lon]).on("click", e => { if (estado.desenho) { mk.closePopup(); adicionarPonto(e.latlng); } }).addTo(camadaMat)
       .bindPopup(`<b>Localização aproximada</b><br>pelo ${esc(loc.precisao)}<br><span class="muted">${esc(loc.nome)}</span><br>${linksGoogle(loc.lat.toFixed(6), loc.lon.toFixed(6))}`).openPopup();
     mapa.setView([loc.lat, loc.lon], 18);
+    if (r.forma && !r.manual) {
+      $("#mat-local").innerHTML = `<p class="muted">Montando o contorno pela metragem da matrícula…</p>`;
+      const rumo = r.forma.orientacao === "rua" ? await rumoDaRua(r, loc) : null;
+      r.posicao = { lat: loc.lat, lon: loc.lon, rumo: rumo ?? 90, rumoRua: rumo != null, lado: 1, afastamento: 6, rot: 0, precisao: loc.precisao };
+      return reposicionar(r);
+    }
     html += `<div class="alerta" style="border-left-color:var(--info);background:var(--info-soft)">Localização <b>aproximada</b> pelo ${esc(loc.precisao)} (OpenStreetMap). Confira no satélite onde fica o imóvel.</div>`;
   } else {
     html += `<div class="alerta">Endereço não encontrado no mapa. Navegue até o imóvel e contorne o terreno.</div>`;
@@ -736,6 +743,91 @@ async function iniciarLocalizacao(r) {
   $("#des-desf").onclick = () => { estado.desenho?.pontos.pop(); redesenhar(); };
   $("#des-canc").onclick = () => encerrarDesenho();
   $("#des-fim").onclick = () => concluirDesenho(r);
+}
+// rumo da rua (azimute em graus) no ponto encontrado, pela geometria do OpenStreetMap
+async function rumoDaRua(r, loc) {
+  if (!r.endereco) return null;
+  const rua = r.endereco.replace(/\s+nº?\s*\d+.*$/, "");
+  const cidade = (r.comarca || "Londrina").toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=8&countrycodes=br&polygon_geojson=1&street=${encodeURIComponent(rua)}&city=${encodeURIComponent(cidade)}`;
+    const vias = await (await fetch(url)).json();
+    let melhor = null;
+    const lat0 = loc.lat * Math.PI / 180, m = (lo, la) => [(lo - loc.lon) * 111320 * Math.cos(lat0), (la - loc.lat) * 110540];
+    for (const v of vias) {
+      const g = v.geojson; if (!g) continue;
+      const linhas = g.type === "LineString" ? [g.coordinates] : g.type === "MultiLineString" ? g.coordinates : [];
+      for (const ln of linhas) for (let i = 0; i < ln.length - 1; i++) {
+        const [ax, ay] = m(...ln[i]), [bx, by] = m(...ln[i + 1]);
+        const dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy; if (!L2) continue;
+        const t = Math.max(0, Math.min(1, -(ax * dx + ay * dy) / L2));
+        const dist = Math.hypot(ax + t * dx, ay + t * dy);
+        if (!melhor || dist < melhor.dist) melhor = { dist, rumo: (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360 };
+      }
+    }
+    return melhor && melhor.dist < 150 ? melhor.rumo : null;
+  } catch { return null; }
+}
+// cantos do terreno em lat/lng a partir da forma (metros) e da posição/rotação escolhidas
+function cantosDaForma(r) {
+  const f = r.forma, p = r.posicao, rad = Math.PI / 180, a = 6378137, e2 = 0.00669438;
+  const lat0 = p.lat * rad, w = 1 - e2 * Math.sin(lat0) ** 2, M = a * (1 - e2) / w ** 1.5, N = a / Math.sqrt(w);
+  const pts = f.pontos_m;
+  let en;
+  if (f.orientacao === "fixa") {  // memorial com azimutes: forma já orientada (x=Leste, y=Norte)
+    const cx = pts.reduce((s, q) => s + q[0], 0) / pts.length, cy = pts.reduce((s, q) => s + q[1], 0) / pts.length, t = p.rot * rad;
+    en = pts.map(([x, y]) => [(x - cx) * Math.cos(t) + (y - cy) * Math.sin(t), -(x - cx) * Math.sin(t) + (y - cy) * Math.cos(t)]);
+  } else {  // frente alinhada à rua, lote do lado escolhido
+    const th = (p.rumo + p.rot) * rad, F = pts[1][0];
+    const u = [Math.sin(th), Math.cos(th)], n = [Math.cos(th) * p.lado, -Math.sin(th) * p.lado];
+    en = pts.map(([x, y]) => [u[0] * (x - F / 2) + n[0] * (y + p.afastamento), u[1] * (x - F / 2) + n[1] * (y + p.afastamento)]);
+  }
+  const k = 0.9996;  // fator de escala UTM: as medidas da matrícula passam a coincidir com as distâncias UTM
+  return en.map(([e, nn]) => [p.lon + e / k / (N * Math.cos(lat0)) / rad, p.lat + nn / k / M / rad]);
+}
+async function reposicionar(r) {
+  try {
+    const ref = areaReferencia(r);
+    const d = await postJSON("api/geo/poligono", { coords_lonlat: cantosDaForma(r), area_referencia_m2: ref });
+    Object.assign(r, { vertices: d.vertices, segmentos: d.segmentos, geojson: d.geojson, area_calculada_m2: d.area_m2, perimetro_m: d.perimetro_m, epsg: d.epsg,
+      datum: `SIRGAS 2000 / UTM ${d.epsg - 31960}S (contorno automático pela metragem)` });
+    r.alertas = r.alertas.filter(a => !a.startsWith("Contorno"));
+    r.alertas.unshift(`Contorno automático montado pela ${r.forma.fonte} e posicionado pelo ${r.posicao.precisao} (OpenStreetMap)` +
+      (r.forma.orientacao === "rua" ? (r.posicao.rumoRua ? ", com a frente alinhada à rua." : "; a direção da rua não foi encontrada.") : ".") +
+      " Confira no satélite e ajuste a posição se necessário.", ...r.forma.avisos.map(a => "Contorno: " + a));
+    renderMatricula(r);
+  } catch (e) { erro("#mat-res", e); }
+}
+function controlesPosicao(r) {
+  if (!r.posicao) return "";
+  return `<div id="mat-ajuste" style="margin-top:14px"><p style="margin:0"><b>Ajustar o contorno automático</b></p>
+    <p class="muted" style="margin:4px 0 0">Arraste o marcador ✥ no centro do terreno para mover. Use os botões para girar ou trocar o lado da rua.</p>
+    <button class="btn sec" data-aj="rot:-5">↺ 5°</button><button class="btn sec" data-aj="rot:-1">↺ 1°</button><button class="btn sec" data-aj="rot:1">↻ 1°</button><button class="btn sec" data-aj="rot:5">↻ 5°</button>
+    ${r.forma.orientacao === "rua" ? `<button class="btn sec" data-aj="lado">Trocar lado da rua</button>` : ""}
+    <button class="btn sec" data-aj="manual">Redesenhar manualmente</button></div>`;
+}
+function ligarControlesPosicao(r) {
+  if (!r.posicao) return;
+  document.querySelectorAll("[data-aj]").forEach(b => b.onclick = () => {
+    const [acao, v] = b.dataset.aj.split(":");
+    if (acao === "rot") r.posicao.rot += +v;
+    if (acao === "lado") r.posicao.lado *= -1;
+    if (acao === "manual") {
+      Object.assign(r, { posicao: null, manual: true, geojson: null, vertices: [], segmentos: [], area_calculada_m2: null, perimetro_m: null, datum: null });
+      r.alertas = r.alertas.filter(a => !a.startsWith("Contorno"));
+      return renderMatricula(r);
+    }
+    reposicionar(r);
+  });
+  const cs = r.geojson.geometry.coordinates[0].slice(0, -1);
+  const centro = [cs.reduce((s, c) => s + c[1], 0) / cs.length, cs.reduce((s, c) => s + c[0], 0) / cs.length];
+  const alca = L.marker(centro, { draggable: true, title: "Arraste para mover o terreno",
+    icon: L.divIcon({ className: "", html: '<div style="width:30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:18px;box-shadow:0 2px 6px rgba(0,0,0,.4);cursor:move">✥</div>', iconSize: [30, 30], iconAnchor: [15, 15] }) }).addTo(camadaMat);
+  alca.on("dragend", () => {
+    const n = alca.getLatLng();
+    r.posicao.lat += n.lat - centro[0]; r.posicao.lon += n.lng - centro[1];
+    reposicionar(r);
+  });
 }
 const camadaDesenho = L.layerGroup().addTo(mapa);
 function iniciarDesenho(r) {

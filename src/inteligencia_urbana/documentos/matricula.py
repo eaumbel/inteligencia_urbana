@@ -116,6 +116,7 @@ class ResultadoMatricula:
     transmissoes: list[dict] = field(default_factory=list)
     ultimo_ato_certificado: int | None = None
     texto_ocr: bool = False
+    forma: dict | None = None  # contorno montado pela metragem (sem coordenadas)
     datum: str | None = None
     epsg: int = EPSG_SIRGAS2000_UTM22S
     atos: list[AtoRegistral] = field(default_factory=list)
@@ -373,10 +374,10 @@ def _lances(texto: str) -> list[tuple[float, float, str | None, int]]:
 
 def _medidas_lineares(texto: str) -> list[MedidaLinear]:
     padrao = re.compile(
-        rf"(?P<m>{NUM})\s*(?:m\b|metros)\s+(?:de\s+|na\s+|pela\s+|para\s+a\s+)?"
-        r"(?P<lado>frente|fundos?|lateral\s+direita|lateral\s+esquerda|lado\s+direito|lado\s+esquerdo|"
-        r"divisa\s+direita|divisa\s+esquerda|laterais?)"
-        r"(?P<resto>[^;.]{0,160})",
+        rf"(?P<m>{NUM})\s*(?:m\b|mts?\.?|metros(?:\s+lineares)?)\s*,?\s+(?:de\s+|d[oa]s?\s+|na\s+|nos?\s+|pela\s+|pelos?\s+|para\s+a\s+|em\s+)?"
+        r"(?P<lado>da\s+frente\s+aos\s+fundos|frente|fundos?|lateral\s+direita|lateral\s+esquerda|lado\s+direito|lado\s+esquerdo|"
+        r"divisa\s+direita|divisa\s+esquerda|laterais?|um\s+lado|outro\s+lado|profundidade)"
+        r"(?P<resto>(?:(?!\d[\d.]*(?:,\d+)?\s*(?:m\b|mts?\.?|metros))[^;.]){0,160})",
         re.I,
     )
     out = []
@@ -384,7 +385,8 @@ def _medidas_lineares(texto: str) -> list[MedidaLinear]:
         resto = m["resto"]
         c = re.search(r"(?:confront\w+\s+com|com|para|divisando\s+com)\s+(?:o\s+|a\s+)?(.+)", resto, re.I)
         try:
-            out.append(MedidaLinear(m["lado"].lower(), parse_numero_br(m["m"]), (c.group(1) if c else resto).strip(" ,")))
+            conf = re.sub(r"^(?:e|,)$", "", (c.group(1) if c else resto).strip(" ,"))
+            out.append(MedidaLinear(m["lado"].lower(), parse_numero_br(m["m"]), conf))
         except ValueError:
             continue
     return out
@@ -549,6 +551,12 @@ def analisar_matricula(texto: str, epsg: int | None = None) -> ResultadoMatricul
             )
         if not fech.aceitavel:
             r.alertas.append(f"Erro de fechamento da poligonal: {fech.erro_linear_m:.3f} m ({fech.precisao_txt}).")
+
+    if not r.vertices:
+        from ..geo.forma import forma_do_terreno
+
+        area_ref = (r.unidade_autonoma or {}).get("area_terreno_condominio_m2") or r.area_declarada_m2
+        r.forma = forma_do_terreno([asdict(m) for m in r.medidas], area_ref, [(a, d) for a, d, _, _ in lances] if len(lances) >= 3 else None)
 
     if r.vertices and len(r.vertices) >= 3 and r.fechamento is None:
         r.fechamento = {**asdict(avaliar_fechamento(0, r.perimetro_m or 0)), "precisao_txt": "polígono por coordenadas"}
