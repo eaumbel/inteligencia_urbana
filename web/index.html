@@ -357,7 +357,7 @@ function tabelaProps(props) {
 }
 
 async function carregarCamadasOficiais() {
-  const { wms } = await (await api("/api/camadas")).json();
+  const { wms } = await (await api("api/camadas")).json();
   wms.forEach(c => {
     const l = L.tileLayer.wms(c.url, { layers: c.layers, format: "image/png", transparent: true, opacity: c.opacidade, maxZoom: 21, attribution: c.fonte });
     l._cfg = c; CAM[c.id] = c;
@@ -415,7 +415,7 @@ async function cruzarCAR() {
   $(alvo).innerHTML = `<div class="card"><p class="muted">Consultando o SICAR…</p></div>`;
   try {
     const feicoes = await wfsNavegador(CAM.car.wfs, CAM.car.layers, bboxMatricula(50));
-    const d = await postJSON("/api/camadas/car-sobreposicao", { vertices_utm: r.vertices.map(v => [v.e, v.n]), epsg: r.epsg, feicoes });
+    const d = await postJSON("api/camadas/car-sobreposicao", { vertices_utm: r.vertices.map(v => [v.e, v.n]), epsg: r.epsg, feicoes });
     camadaCruz.clearLayers();
     L.geoJSON({ type: "FeatureCollection", features: d.features }, { style: { color: "#b23cfd", weight: 2, dashArray: "6 4", fillOpacity: .12 },
       onEachFeature: (f, l) => l.bindPopup(`<b>CAR</b>${tabelaProps(f.properties)}`) }).addTo(camadaCruz);
@@ -431,7 +431,7 @@ async function buscarDrenagem() {
   $(alvo).innerHTML = `<div class="card"><p class="muted">Consultando a hidrografia do IBGE…</p></div>`;
   try {
     const feicoes = await wfsNavegador(CAM.drenagem.wfs, CAM.drenagem.layers, bboxMatricula(raio));
-    const d = await postJSON("/api/camadas/drenagem", { vertices_utm: r.vertices.map(v => [v.e, v.n]), epsg: r.epsg, raio_m: raio, feicoes });
+    const d = await postJSON("api/camadas/drenagem", { vertices_utm: r.vertices.map(v => [v.e, v.n]), epsg: r.epsg, raio_m: raio, feicoes });
     camadaCruz.clearLayers();
     L.geoJSON({ type: "FeatureCollection", features: d.features }, { style: { color: "#1e88ff", weight: 4 },
       onEachFeature: (f, l) => l.bindTooltip(`${esc(f.properties.nome)} — ${fmt(f.properties.distancia_m, 0)} m`) }).addTo(camadaCruz);
@@ -496,7 +496,7 @@ $("#mat-ir").onclick = async () => {
   if ($("#mat-arq").files[0]) fd.append("arquivo", $("#mat-arq").files[0]); else fd.append("texto", $("#mat-txt").value);
   if ($("#mat-epsg").value) fd.append("epsg", $("#mat-epsg").value);
   try {
-    const r = await (await api("/api/matricula/analisar", { method: "POST", body: fd })).json();
+    const r = await (await api("api/matricula/analisar", { method: "POST", body: fd })).json();
     estado.matricula = r; renderMatricula(r);
   } catch (e) { erro("#mat-res", e); }
 };
@@ -537,7 +537,7 @@ function renderMatricula(r) {
     const kml = async kmz => {
       const corpo = { nome: `Matrícula ${r.numero || ""}`.trim(), epsg: r.epsg, vertices: r.vertices, segmentos: r.segmentos, kmz,
         info: { "Matrícula": r.numero || "—", "Área declarada (m²)": fmt(r.area_declarada_m2), "Área calculada (m²)": fmt(r.area_calculada_m2), "Perímetro (m)": fmt(r.perimetro_m) } };
-      const resp = await api("/api/geo/kml", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
+      const resp = await api("api/geo/kml", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
       baixar(await resp.blob(), `matricula_${r.numero || "imovel"}.${kmz ? "kmz" : "kml"}`);
     };
     $("#mat-kml").onclick = () => kml(false); $("#mat-kmz").onclick = () => kml(true);
@@ -554,7 +554,7 @@ $("#dir-ir").onclick = async () => {
   const fd = new FormData();
   if ($("#dir-arq").files[0]) fd.append("arquivo", $("#dir-arq").files[0]); else fd.append("texto", $("#dir-txt").value);
   try {
-    const d = await (await api("/api/diretrizes/analisar", { method: "POST", body: fd })).json();
+    const d = await (await api("api/diretrizes/analisar", { method: "POST", body: fd })).json();
     const temas = Object.entries(d.trechos_por_tema).map(([t, l]) => `<details><summary>${esc(t.replace(/_/g, " "))} (${l.length})</summary><ul>${l.map(x => `<li>${esc(x)}</li>`).join("")}</ul></details>`).join("");
     $("#dir-res").innerHTML = `<div class="card"><h2>Diretrizes identificadas</h2>${alertasHTML(d.alertas)}
       <table><tr><th>Consulta</th><td>${esc(d.numero_consulta || "—")}</td></tr><tr><th>Zonas</th><td>${d.zonas.map(z => `<span class="tag">${esc(z)}</span>`).join("") || "—"}</td></tr>
@@ -568,12 +568,12 @@ $("#dir-ir").onclick = async () => {
 
 // ---------- zoneamento
 async function carregarCidades() {
-  const { cidades } = await (await api("/api/zoneamento")).json();
+  const { cidades } = await (await api("api/zoneamento")).json();
   $("#zon-cidade").innerHTML = cidades.map(c => `<option>${c}</option>`).join("");
   await carregarZonas();
 }
 async function carregarZonas() {
-  const d = await (await api("/api/zoneamento/" + $("#zon-cidade").value)).json();
+  const d = await (await api("api/zoneamento/" + $("#zon-cidade").value)).json();
   $("#zon-zona").innerHTML = Object.entries(d.zonas).map(([k, z]) => `<option value="${k}">${k} — ${esc(z.nome)}</option>`).join("");
   $("#zon-status").textContent = d.status_dados || "";
 }
@@ -581,7 +581,7 @@ $("#zon-cidade").onchange = carregarZonas;
 $("#zon-ir").onclick = async () => {
   try {
     const body = { cidade: $("#zon-cidade").value, zona: $("#zon-zona").value, area_terreno_m2: +$("#zon-area").value, area_app_m2: +$("#zon-app").value };
-    const d = await (await api("/api/vocacao", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
+    const d = await (await api("api/vocacao", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
     const z = d.zona, v = d.vocacao;
     $("#zon-res").innerHTML = `<div class="card"><h2>${esc(z.codigo)} — ${esc(z.nome)}</h2>${alertasHTML(v.observacoes)}
       <div class="kpis"><div class="kpi"><small>Potencial construtivo</small><b>${fmt(v.potencial_construtivo_m2, 0)} m²</b></div><div class="kpi"><small>Projeção máxima</small><b>${fmt(v.projecao_maxima_m2, 0)} m²</b></div></div>
@@ -593,7 +593,7 @@ $("#zon-ir").onclick = async () => {
 
 // ---------- formulários gerados a partir do schema da API
 async function schemas() {
-  if (!estado.schemas) estado.schemas = (await (await api("/openapi.json")).json()).components.schemas;
+  if (!estado.schemas) estado.schemas = (await (await api("openapi.json")).json()).components.schemas;
   return estado.schemas;
 }
 const PALAVRAS = { area: "área", areas: "áreas", minimo: "mínimo", minima: "mínima", angulo: "ângulo", publica: "pública", app: "APP",
@@ -632,7 +632,7 @@ $("#via-tipo").onchange = montarViabilidade;
 $("#via-ir").onclick = async () => {
   const tipo = $("#via-tipo").value;
   try {
-    const r = await (await api("/api/viabilidade/" + tipo, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(lerForm("#via-form")) })).json();
+    const r = await (await api("api/viabilidade/" + tipo, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(lerForm("#via-form")) })).json();
     const i = r.indicadores;
     const linhas = obj => Object.entries(obj).map(([k, v]) => `<tr><th>${esc(k.replace(/_/g, " "))}</th><td>${typeof v === "number" ? (/m2|pct/.test(k) ? fmt(v) : brl(v)) : v ?? "—"}</td></tr>`).join("");
     $("#via-res").innerHTML = `<div class="card"><h2>Resultado</h2>${alertasHTML(r.alertas)}
@@ -684,7 +684,7 @@ $("#mp-ir").onclick = async () => {
   if (!perimetroMp) return erro("#mp-res", "Sem perímetro: analise uma matrícula com coordenadas ou use o exemplo.");
   try {
     const body = { ...lerForm("#mp-form"), perimetro_utm: perimetroMp, epsg: epsgMp, cursos_dagua_utm: estado.cursos || [] };
-    const m = await (await api("/api/masterplan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
+    const m = await (await api("api/masterplan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
     estado.masterplan = m;
     $("#mp-res").innerHTML = `<div class="card"><h2>Resultado</h2>${alertasHTML(m.alertas)}<div id="mp-svg">${m.svg}</div>
       <button class="btn" id="mp-kml">Baixar KML (Google Earth)</button><button class="btn sec" id="mp-svgdl">Baixar imagem (SVG)</button><button class="btn sec" id="mp-via">Levar para viabilidade</button></div>`;
@@ -694,7 +694,7 @@ $("#mp-ir").onclick = async () => {
       onEachFeature: (f, l) => l.bindTooltip(`${esc(f.properties.nome)} — ${fmt(f.properties.area_m2)} m²`),
     }).addTo(camadaMp);
     mapa.fitBounds(g.getBounds());
-    $("#mp-kml").onclick = async () => baixar(await (await api("/api/geo/kml-features", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome: "Masterplan", features: m.features }) })).blob(), "masterplan.kml");
+    $("#mp-kml").onclick = async () => baixar(await (await api("api/geo/kml-features", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome: "Masterplan", features: m.features }) })).blob(), "masterplan.kml");
     $("#mp-svgdl").onclick = () => baixar(new Blob([m.svg], { type: "image/svg+xml" }), "masterplan.svg");
     $("#mp-via").onclick = async () => {
       document.querySelector('[data-aba="viabilidade"]').click(); $("#via-tipo").value = "loteamento"; await montarViabilidade();
@@ -710,7 +710,7 @@ $("#mp-ir").onclick = async () => {
 $("#re-ir").onclick = async () => {
   const body = { baixa_renda_predominante: $("#re-renda").checked, nucleo_consolidado_ate_2016: $("#re-2016").checked, area_publica: $("#re-pub").checked, em_app: $("#re-app").checked, em_area_de_risco: $("#re-risco").checked };
   try {
-    const r = await (await api("/api/reurb/classificar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
+    const r = await (await api("api/reurb/classificar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
     const lista = (t, l) => `<h2>${t}</h2><ul>${l.map(x => `<li>${esc(x)}</li>`).join("")}</ul>`;
     $("#re-res").innerHTML = `<div class="card"><h2 style="font-size:17px">${esc(r.modalidade)}</h2>${alertasHTML(r.alertas)}${lista("Fundamentos", r.fundamentos)}${lista("Instrumentos", r.instrumentos)}${lista("Documentos técnicos", r.documentos)}</div>`;
   } catch (e) { erro("#re-res", e); }

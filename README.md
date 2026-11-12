@@ -79,6 +79,19 @@ Para conectar:
 3. Clique em **Deploy**. A cada push no branch de produção a Vercel publica de novo; nos demais branches ela gera
    uma URL de prévia.
 
+### Publicar em uma subpasta de outro domínio (ex.: eaumbel.com.br/incorporacao)
+
+A interface usa apenas caminhos relativos (`api/...`), então o app funciona em qualquer subpasta. O site do
+domínio principal só precisa repassar `/incorporacao/*` para `https://inteligencia-urbana.vercel.app/*`.
+Se o domínio principal também estiver na Vercel, basta incluir no `vercel.json` **daquele** projeto:
+
+```json
+{
+  "redirects": [{ "source": "/incorporacao", "destination": "/incorporacao/", "permanent": true }],
+  "rewrites": [{ "source": "/incorporacao/:path*", "destination": "https://inteligencia-urbana.vercel.app/:path*" }]
+}
+```
+
 ## Avisos importantes
 
 - **Zoneamento:** os YAML de cada cidade trazem a estrutura completa, mas os **índices são ilustrativos**

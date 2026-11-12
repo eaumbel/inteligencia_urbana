@@ -37,7 +37,7 @@ CAMADA_MASSA_DAGUA = "CCAR:BC250_2025_hid_massa_dagua_a"
 CAMADA_MUNICIPIOS = "CCAR:BC250_2025_lml_municipio_a"
 
 CAMADAS_WMS = [
-    {"id": "car", "nome": "CAR — imóveis rurais (SICAR)", "url": "/api/proxy/car-wms", "wfs": "/api/proxy/car-wfs",
+    {"id": "car", "nome": "CAR — imóveis rurais (SICAR)", "url": "api/proxy/car-wms", "wfs": "api/proxy/car-wfs",
      "url_oficial": CAR_WMS, "layers": CAMADA_CAR_PR,
      "opacidade": 0.55, "consultavel": True, "fonte": "SICAR/SFB", "escala": "declaratório"},
     {"id": "drenagem", "nome": "Hidrografia — cursos d'água (IBGE)", "url": IBGE_WMS, "wfs": IBGE_WFS, "layers": CAMADA_DRENAGEM,
