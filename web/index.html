@@ -481,11 +481,58 @@ $("#cam-wms-ir").onclick = () => {
 };
 const CORES = { lote: "#f6d58e", via: "#bdbdbd", area_verde: "#7cc576", institucional: "#f2a65a", app: "#2e7d32", remanescente: "#e0e0e0" };
 
+const ERROS_HTTP = {
+  413: "Arquivo grande demais para envio ao servidor (limite de 4,5 MB).",
+  500: "Erro interno no servidor ao processar o pedido.",
+  502: "Um serviço externo não respondeu.",
+  504: "O servidor demorou demais para responder. Tente novamente.",
+};
 async function api(url, opts = {}) {
-  const r = await fetch(url, opts);
-  if (!r.ok) { let m = r.statusText; try { const j = await r.json(); m = typeof j.detail === "string" ? j.detail : (j.detail || []).map(d => `${rotuloCampo(String(d.loc.slice(-1)[0]))}: ${d.type === "missing" ? "campo obrigatório" : d.msg}`).join("; "); } catch {} throw new Error(m); }
+  let r;
+  try { r = await fetch(url, opts); } catch (e) { throw new Error("Sem conexão com o servidor. Verifique a internet e tente de novo."); }
+  if (!r.ok) {
+    const corpo = await r.text();
+    let m = "";
+    try {
+      const j = JSON.parse(corpo);
+      m = typeof j.detail === "string" ? j.detail : (j.detail || []).map(d => `${rotuloCampo(String(d.loc.slice(-1)[0]))}: ${d.type === "missing" ? "campo obrigatório" : d.msg}`).join("; ");
+    } catch {}
+    if (!m) m = `${ERROS_HTTP[r.status] || "Falha na requisição."} (código ${r.status}${corpo ? " — " + corpo.slice(0, 120).replace(/\s+/g, " ") : ""})`;
+    throw new Error(m);
+  }
   return r;
 }
+
+// Leitura de PDF no navegador (pdf.js): envia só o texto ao servidor, sem limite de tamanho do arquivo
+const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+let pdfjsPromessa = null;
+function carregarPdfJs() {
+  if (!pdfjsPromessa) pdfjsPromessa = new Promise((ok, falha) => {
+    const sc = document.createElement("script");
+    sc.src = PDFJS + "pdf.min.js";
+    sc.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + "pdf.worker.min.js"; ok(window.pdfjsLib); };
+    sc.onerror = () => { pdfjsPromessa = null; falha(new Error("Não foi possível carregar o leitor de PDF. Verifique a internet.")); };
+    document.head.appendChild(sc);
+  });
+  return pdfjsPromessa;
+}
+async function textoDoArquivo(arq, aviso) {
+  if (!/\.pdf$/i.test(arq.name) && arq.type !== "application/pdf") return await arq.text();
+  const lib = await carregarPdfJs();
+  const pdf = await lib.getDocument({ data: await arq.arrayBuffer() }).promise;
+  const paginas = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    aviso(`Lendo o PDF: página ${i} de ${pdf.numPages}…`);
+    const c = await (await pdf.getPage(i)).getTextContent();
+    paginas.push(c.items.map(it => it.str + (it.hasEOL ? "\n" : " ")).join(""));
+  }
+  const texto = paginas.join("\n");
+  if (texto.replace(/\s/g, "").length < 50)
+    throw new Error(`Este PDF (${pdf.numPages} página${pdf.numPages > 1 ? "s" : ""}) é uma imagem escaneada, sem texto selecionável. ` +
+      "Por enquanto, copie o texto da certidão e cole no campo \"…ou cole o texto\", ou use a versão digital da certidão (e-certidão do ONR/Registro de Imóveis).");
+  return texto;
+}
+const carregando = (alvo, txt) => { $(alvo).innerHTML = `<div class="card"><p class="muted">${esc(txt)}</p></div>`; };
 function erro(alvo, e) { $(alvo).innerHTML = `<div class="card"><div class="alerta">${esc(e.message || e)}</div></div>`; }
 function baixar(blob, nome) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = nome; a.click(); }
 const alertasHTML = l => (l || []).map(a => `<div class="alerta">${esc(a)}</div>`).join("");
@@ -493,9 +540,14 @@ const alertasHTML = l => (l || []).map(a => `<div class="alerta">${esc(a)}</div>
 // ---------- matrícula
 $("#mat-ir").onclick = async () => {
   const fd = new FormData();
-  if ($("#mat-arq").files[0]) fd.append("arquivo", $("#mat-arq").files[0]); else fd.append("texto", $("#mat-txt").value);
-  if ($("#mat-epsg").value) fd.append("epsg", $("#mat-epsg").value);
   try {
+    const arq = $("#mat-arq").files[0];
+    const texto = arq ? await textoDoArquivo(arq, t => carregando("#mat-res", t)) : $("#mat-txt").value;
+    if (!texto.trim()) throw new Error("Escolha um arquivo ou cole o texto da matrícula.");
+    if (arq) $("#mat-txt").value = texto;
+    fd.append("texto", texto);
+    if ($("#mat-epsg").value) fd.append("epsg", $("#mat-epsg").value);
+    carregando("#mat-res", "Analisando a matrícula…");
     const r = await (await api("api/matricula/analisar", { method: "POST", body: fd })).json();
     estado.matricula = r; renderMatricula(r);
   } catch (e) { erro("#mat-res", e); }
@@ -552,8 +604,13 @@ function renderMatricula(r) {
 // ---------- diretrizes
 $("#dir-ir").onclick = async () => {
   const fd = new FormData();
-  if ($("#dir-arq").files[0]) fd.append("arquivo", $("#dir-arq").files[0]); else fd.append("texto", $("#dir-txt").value);
   try {
+    const arq = $("#dir-arq").files[0];
+    const texto = arq ? await textoDoArquivo(arq, t => carregando("#dir-res", t)) : $("#dir-txt").value;
+    if (!texto.trim()) throw new Error("Escolha um arquivo ou cole o texto da consulta.");
+    if (arq) $("#dir-txt").value = texto;
+    fd.append("texto", texto);
+    carregando("#dir-res", "Analisando as diretrizes…");
     const d = await (await api("api/diretrizes/analisar", { method: "POST", body: fd })).json();
     const temas = Object.entries(d.trechos_por_tema).map(([t, l]) => `<details><summary>${esc(t.replace(/_/g, " "))} (${l.length})</summary><ul>${l.map(x => `<li>${esc(x)}</li>`).join("")}</ul></details>`).join("");
     $("#dir-res").innerHTML = `<div class="card"><h2>Diretrizes identificadas</h2>${alertasHTML(d.alertas)}
