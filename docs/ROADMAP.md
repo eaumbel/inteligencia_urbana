@@ -30,6 +30,7 @@
 - [ ] Persistência de projetos e estudos (Supabase/Postgres + PostGIS) e login
 - [ ] Relatório de viabilidade em PDF/DOCX com mapa, masterplan e quadros
 - [ ] Topografia: importar curvas de nível/MDE, mapa de declividade (bloqueio de ≥ 30%) e hidrografia
-- [ ] Masterplan com diretrizes viárias obrigatórias e quadras não ortogonais
+- [x] Masterplan com diretrizes viárias do IPPUL (vias previstas com largura oficial, fundo de vale, 12% de áreas públicas)
+- [ ] Masterplan com quadras não ortogonais e local preferencial da área institucional indicado no croqui
 - [ ] Cenários e sensibilidade (preço, velocidade de vendas, custo, juros) e correção das parcelas (IPCA/INCC)
 - [ ] Importar KML/KMZ/DXF de levantamento topográfico

@@ -35,6 +35,12 @@ CORES = {
 }
 
 
+class ViaPrevista(BaseModel):
+    largura_m: float = Field(..., gt=3, description="Largura total oficial da via (caixa)")
+    hierarquia: str = "via prevista"
+    partes_utm: list[list[tuple[float, float]]] = Field(..., description="Polígonos do traçado (traços do croqui)")
+
+
 class ParametrosMasterplan(BaseModel):
     perimetro_utm: list[tuple[float, float]] = Field(..., min_length=3)
     epsg: int = EPSG_SIRGAS2000_UTM22S
@@ -50,6 +56,9 @@ class ParametrosMasterplan(BaseModel):
     pct_institucional: float = Field(5, ge=0, le=50)
     largura_minima_area_publica_m: float = Field(10, ge=0, description="Sobras mais estreitas viram remanescente")
     angulo_graus: float | None = Field(None, description="Orientação da malha; None = automático")
+    vias_previstas: list[ViaPrevista] = Field(default_factory=list, description="Diretrizes viárias (ex.: croqui do IPPUL)")
+    fundo_vale_utm: list[list[tuple[float, float]]] = Field(default_factory=list, description="Polígonos de fundo de vale")
+    hidrografia_utm: list[list[tuple[float, float]]] = Field(default_factory=list, description="Cursos d'água (linhas ou polígonos)")
 
 
 @dataclass
@@ -86,8 +95,28 @@ def gerar_masterplan(p: ParametrosMasterplan) -> Masterplan:
     gleba = Polygon(p.perimetro_utm).buffer(0)
     exclus = [Polygon(e).buffer(0) for e in p.exclusoes_utm]
     exclus += [LineString(c).buffer(p.largura_app_m, cap_style="flat") for c in p.cursos_dagua_utm if len(c) >= 2]
+    exclus += [Polygon(f).buffer(0) for f in p.fundo_vale_utm if len(f) >= 3]
+    for h in p.hidrografia_utm:  # leito desenhado (polígono) ou eixo (linha) + APP
+        if len(h) >= 3 and Polygon(h).buffer(0).area > 1:
+            exclus.append(Polygon(h).buffer(0).buffer(p.largura_app_m))
+        elif len(h) >= 2:
+            exclus.append(LineString(h).buffer(p.largura_app_m))
     app = unary_union(exclus).intersection(gleba) if exclus else Polygon()
-    util = gleba.difference(app) if not app.is_empty else gleba
+
+    # vias previstas: os traços do croqui marcam o eixo; a faixa recebe a largura oficial
+    vias_prev = []
+    for v in p.vias_previstas:
+        partes = [Polygon(pp).buffer(0) for pp in v.partes_utm if len(pp) >= 3]
+        partes = [g for g in partes if g.area > 0]
+        if not partes:
+            continue
+        largura_traco = sorted(min(math.dist(a, b) for a, b in zip(list(g.minimum_rotated_rectangle.exterior.coords)[:2],
+                                                              list(g.minimum_rotated_rectangle.exterior.coords)[1:3])) for g in partes)[len(partes) // 2]
+        faixa = unary_union(partes).buffer(max((v.largura_m - largura_traco) / 2, 0.5), join_style=1).intersection(gleba)
+        if not faixa.is_empty:
+            vias_prev.append((v, faixa.difference(app)))
+    vias_prev_uniao = unary_union([f for _, f in vias_prev]) if vias_prev else Polygon()
+    util = gleba.difference(unary_union([app, vias_prev_uniao])) if not (app.is_empty and vias_prev_uniao.is_empty) else gleba
 
     ang = p.angulo_graus if p.angulo_graus is not None else _angulo_automatico(util)
     origem = util.centroid
@@ -170,7 +199,10 @@ def gerar_masterplan(p: ParametrosMasterplan) -> Masterplan:
     # volta para coordenadas UTM reais
     feats_utm = [(t, affinity.rotate(g, ang, origin=origem), pr) for t, g, pr in feats_local]
     for pg in _poligonos(app):
-        feats_utm.append(("app", pg, {"nome": "APP / restrição", "area_m2": round(pg.area, 2)}))
+        feats_utm.append(("app", pg, {"nome": "APP / fundo de vale / restrição", "area_m2": round(pg.area, 2)}))
+    for v, faixa in vias_prev:
+        for pg in _poligonos(faixa):
+            feats_utm.append(("via", pg, {"nome": f"{v.hierarquia} prevista ({v.largura_m:.0f} m)", "diretriz": True, "area_m2": round(pg.area, 2)}))
 
     tr = _transformer(p.epsg, EPSG_WGS84)
     features = []
@@ -188,6 +220,7 @@ def gerar_masterplan(p: ParametrosMasterplan) -> Masterplan:
         "area_lotes_m2": round(a_lotes, 2),
         "lote_medio_m2": round(a_lotes / n, 2) if n else 0,
         "area_vias_m2": round(soma("via"), 2),
+        "area_vias_diretriz_m2": round(vias_prev_uniao.area, 2),
         "area_verde_m2": round(soma("area_verde"), 2),
         "area_institucional_m2": round(soma("institucional"), 2),
         "area_remanescente_m2": round(soma("remanescente"), 2),

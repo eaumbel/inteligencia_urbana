@@ -98,6 +98,23 @@ def montar_croqui(formas: list[dict], area_total_m2: float, rotulo_lote: tuple[f
             if cat != "fundo_de_vale" and _caixa(cat, pts) in vistos:  # contorno da mesma forma já preenchida
                 continue
             feicoes.append({"tipo": cat, "geom": "linha", "pts": [conv(p) for p in pts]})
+    # fundo de vale: área desenhada como textura de tracinhos/pontos verdes → polígono contínuo
+    textura = []
+    for f in formas:
+        cor = f.get("stroke") or f.get("fill")
+        if _categoria(cor) == "fundo_de_vale" and (limite_y is None or min(p[1] for p in f["pts"]) <= limite_y):
+            xs, ys = [p[0] for p in f["pts"]], [p[1] for p in f["pts"]]
+            if max(max(xs) - min(xs), max(ys) - min(ys)) * escala < 4:
+                textura.append(((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2))
+    if len(textura) >= 30:
+        from shapely.geometry import Point
+        from shapely.ops import unary_union
+
+        raio = 6 / escala * 1.4111  # ~6 pt na escala usual do IPPUL, em pontos do desenho
+        g = unary_union([Point(x, y).buffer(raio, 4) for x, y in textura]).buffer(-raio * 0.6).simplify(raio * 0.3)
+        for pg in ([g] if g.geom_type == "Polygon" else list(getattr(g, "geoms", []))):
+            if pg.area * escala**2 >= 500:
+                feicoes.append({"tipo": "fundo_de_vale_area", "geom": "poligono", "pts": [conv(p) for p in list(pg.exterior.coords)[:-1]]})
     return {
         "lote_m": [conv(p) for p in lote],
         "escala_m_por_pt": round(escala, 4),

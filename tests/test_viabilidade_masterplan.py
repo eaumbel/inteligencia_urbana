@@ -116,3 +116,26 @@ def test_api_poligono_desenhado():
     assert [round(s["distancia_m"], 1) for s in r["segmentos"]] == [30.0, 30.0, 30.0, 30.0]
     cruzado = [pts[0], pts[2], pts[1], pts[3]]
     assert c.post("/api/geo/poligono", json={"coords_lonlat": cruzado}).status_code == 422
+
+
+def test_masterplan_com_diretrizes():
+    from inteligencia_urbana.masterplan.gerador import ViaPrevista
+
+    # via coletora norte-sul no meio da gleba (traços de 4 m de largura, com falhas) e fundo de vale a leste
+    tracos = [[(480198, y), (480202, y), (480202, y - 10), (480198, y - 10)] for y in range(7418000, 7417700, -14)]
+    fv = [(480350, 7418000), (480400, 7418000), (480400, 7417700), (480350, 7417700)]
+    m = gerar_masterplan(ParametrosMasterplan(
+        perimetro_utm=RET, vias_previstas=[ViaPrevista(largura_m=20, hierarquia="Coletora", partes_utm=tracos)],
+        fundo_vale_utm=[fv]))
+    r = m.resumo
+    assert r["area_vias_diretriz_m2"] == pytest.approx(20 * 300, rel=0.03)  # faixa contínua de 20 m
+    assert r["area_app_m2"] == pytest.approx(50 * 300, rel=0.01)
+    prevista = [f for f in m.features if f["properties"].get("diretriz")]
+    assert prevista and prevista[0]["properties"]["nome"] == "Coletora prevista (20 m)"
+    # nenhum lote sobre a via prevista nem no fundo de vale
+    from shapely.geometry import shape, box
+    from inteligencia_urbana.geo.coordenadas import utm_para_geo
+    lon0, lat0 = utm_para_geo(480190, 7418000); lon1, lat1 = utm_para_geo(480210, 7417700)
+    faixa = box(min(lon0, lon1), min(lat0, lat1), max(lon0, lon1), max(lat0, lat1))
+    lotes = [shape(f["geometry"]) for f in m.features if f["properties"]["tipo"] == "lote"]
+    assert lotes and all(l.intersection(faixa).area < 1e-10 for l in lotes)
