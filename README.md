@@ -9,6 +9,15 @@ Municípios iniciais: **Londrina, Cambé, Rolândia e Ibiporã** (PR). Outros en
 
 ![Masterplan](docs/img/2_masterplan.png)
 
+## Passo a passo (aba "Novo estudo")
+
+1. **Matrícula** (obrigatória): o PDF é lido (com OCR se for escaneado), analisado e o imóvel é localizado e
+   contornado no mapa. A etapa só termina com o contorno pronto; ajustes de posição ficam disponíveis ali.
+2. **Consulta de Parcelamento do Solo (IPPUL)**: liberada após a matrícula. O croqui é encaixado sobre o imóvel
+   e as diretrizes (vias previstas, fundo de vale, áreas públicas, zona) são aplicadas.
+3. **Masterplan**: gerado automaticamente com as diretrizes e demarcado no mapa (quadras, lotes numerados com
+   área, vias previstas, áreas verde e institucional, APP), com KML e atalho para a viabilidade.
+
 ## Módulos
 
 | Módulo | O que faz |

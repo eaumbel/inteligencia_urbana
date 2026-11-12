@@ -123,9 +123,21 @@ ul{padding-left:20px;margin:6px 0} li{margin:3px 0}
 .leaflet-tooltip.medida{background:rgba(20,22,25,.82);color:#fff;border:0;border-radius:6px;padding:2px 6px;font:700 11.5px/1.3 var(--font-body);box-shadow:none;white-space:nowrap}
 .leaflet-tooltip.medida::before{display:none}
 .leaflet-tooltip.medida-area{background:var(--accent);font-size:12.5px;padding:4px 8px}
+.leaflet-tooltip.medida-lote{background:rgba(255,255,255,.9);color:#1f2a24;font-size:10px;line-height:1.15;text-align:center;padding:1px 4px}
 .leaflet-container.desenhando{cursor:crosshair}
+.etapa-h{display:flex;gap:14px;align-items:flex-start}
+.etapa-h h2{margin:2px 0 2px}
+.etapa-h .muted{margin:0}
+.etapa-n{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-family:var(--font-display);font-weight:700;background:var(--accent);color:#fff}
+.etapa-st{margin-left:auto;flex:none;font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;background:var(--surface-2);color:var(--muted);white-space:nowrap}
+.etapa.feita .etapa-n{background:var(--ok)}
+.etapa.feita .etapa-st{background:var(--ok-soft);color:var(--ok)}
+.etapa.bloqueada{opacity:.55}
+.etapa.bloqueada .etapa-b{display:none}
+.etapa.bloqueada .etapa-n{background:var(--line-strong)}
+.etapa-b{margin-top:12px}
 .passos{margin:8px 0 0;padding-left:18px;font-size:13px;color:var(--muted)}
-#mp-svg svg{width:100%;height:auto;border:1px solid var(--line);border-radius:10px;background:#fafafa}
+#mp-svg svg,.mp-svg svg{width:100%;height:auto;border:1px solid var(--line);border-radius:10px;background:#fafafa}
 
 /* ---------- Mapa (Leaflet) no tema do app ---------- */
 .leaflet-container{font-family:var(--font-body)}
@@ -164,8 +176,10 @@ ul{padding-left:20px;margin:6px 0} li{margin:3px 0}
     <div><b>Inteligência Urbana</b><span>Incorporação e urbanismo</span></div>
   </div>
   <nav id="abas">
+    <div class="nav-label">Estudo guiado</div>
+    <button data-aba="estudo" class="ativo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg>Novo estudo</button>
     <div class="nav-label">Documentos</div>
-    <button data-aba="matricula" class="ativo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>Matrícula</button>
+    <button data-aba="matricula"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>Matrícula</button>
     <button data-aba="diretrizes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1z"/><path d="M8 6H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2"/><path d="m9 14 2 2 4-4"/></svg>Diretrizes (IPPUL)</button>
     <div class="nav-label">Análise</div>
     <button data-aba="zoneamento"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Zoneamento</button>
@@ -183,12 +197,36 @@ ul{padding-left:20px;margin:6px 0} li{margin:3px 0}
 <div class="principal">
   <header class="topbar">
     <button class="menu-btn" id="menu-btn" aria-label="Abrir menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
-    <div><h1 id="titulo">Matrícula</h1><div class="sub" id="subtitulo"></div></div>
+    <div><h1 id="titulo">Novo estudo</h1><div class="sub" id="subtitulo"></div></div>
   </header>
 <main class="trabalho">
 <section class="col-form">
+  <!-- NOVO ESTUDO (passo a passo) -->
+  <div class="painel ativo" id="p-estudo">
+    <div class="card etapa" id="wz-1">
+      <div class="etapa-h"><span class="etapa-n">1</span><div><h2>Matrícula do imóvel</h2><p class="muted">Certidão de inteiro teor (PDF, inclusive escaneada). O sistema lê, analisa e marca o imóvel no mapa.</p></div><span class="etapa-st" id="wz-1-st"></span></div>
+      <div class="etapa-b">
+        <label>PDF da matrícula</label><input type="file" id="wz-mat-arq" accept=".pdf,.txt">
+        <button class="btn" id="wz-mat-ir">Analisar matrícula</button>
+        <div id="wz-mat-res"></div>
+      </div>
+    </div>
+    <div class="card etapa bloqueada" id="wz-2">
+      <div class="etapa-h"><span class="etapa-n">2</span><div><h2>Consulta de Parcelamento do Solo (IPPUL)</h2><p class="muted">Liberada após a matrícula. O croqui do IPPUL é encaixado sobre o imóvel.</p></div><span class="etapa-st" id="wz-2-st"></span></div>
+      <div class="etapa-b">
+        <label>PDF da consulta do IPPUL</label><input type="file" id="wz-dir-arq" accept=".pdf,.txt">
+        <button class="btn" id="wz-dir-ir">Analisar consulta e gerar masterplan</button>
+        <div id="wz-dir-res"></div>
+      </div>
+    </div>
+    <div class="card etapa bloqueada" id="wz-3">
+      <div class="etapa-h"><span class="etapa-n">3</span><div><h2>Masterplan com as diretrizes</h2><p class="muted">Gerado automaticamente com lotes, vias previstas, fundo de vale e áreas públicas demarcados.</p></div><span class="etapa-st" id="wz-3-st"></span></div>
+      <div class="etapa-b"><div id="wz-mp-res"></div></div>
+    </div>
+  </div>
+
   <!-- MATRÍCULA -->
-  <div class="painel ativo" id="p-matricula">
+  <div class="painel" id="p-matricula">
     <div class="card">
       <h2>Análise de matrícula</h2>
       <label>PDF ou TXT da certidão de inteiro teor</label><input type="file" id="mat-arq" accept=".pdf,.txt">
@@ -301,6 +339,7 @@ const estado = { matricula: null, masterplan: null, schemas: null };
 
 // ---------- abas
 const SUBTITULOS = {
+  estudo: "Passo a passo: matrícula → consulta do IPPUL → masterplan",
   matricula: "Certidão de inteiro teor: atos, ônus, memorial descritivo e confrontações",
   diretrizes: "Consulta prévia e diretrizes de parcelamento do solo",
   zoneamento: "Parâmetros urbanísticos e vocação da área",
@@ -317,7 +356,7 @@ document.querySelectorAll("#abas button").forEach(b => b.onclick = () => {
   document.body.classList.remove("nav-aberta");
   setTimeout(() => mapa.invalidateSize(), 50);
 });
-$("#subtitulo").textContent = SUBTITULOS.matricula;
+$("#subtitulo").textContent = SUBTITULOS.estudo;
 $("#menu-btn").onclick = () => document.body.classList.toggle("nav-aberta");
 document.body.addEventListener("click", e => { if (document.body.classList.contains("nav-aberta") && !e.target.closest(".side, #menu-btn")) document.body.classList.remove("nav-aberta"); });
 const corMapa = () => getComputedStyle(document.documentElement).getPropertyValue("--accent-map").trim() || "#e5383f";
@@ -586,20 +625,22 @@ function baixar(blob, nome) { const a = document.createElement("a"); a.href = UR
 const alertasHTML = l => (l || []).map(a => `<div class="alerta">${esc(a)}</div>`).join("");
 
 // ---------- matrícula
-$("#mat-ir").onclick = async () => {
+async function analisarMatricula({ arq, texto, epsg, aviso }) {
+  const lido = arq ? await textoDoArquivo(arq, aviso) : { texto: texto || "", ocr: 0 };
+  if (!lido.texto.trim()) throw new Error("Escolha um arquivo ou cole o texto da matrícula.");
+  if (arq) $("#mat-txt").value = lido.texto;
   const fd = new FormData();
-  try {
-    const arq = $("#mat-arq").files[0];
-    const lido = arq ? await textoDoArquivo(arq, t => carregando("#mat-res", t)) : { texto: $("#mat-txt").value, ocr: 0 };
-    const texto = lido.texto;
-    if (!texto.trim()) throw new Error("Escolha um arquivo ou cole o texto da matrícula.");
-    if (arq) $("#mat-txt").value = texto;
-    fd.append("texto", texto);
-    if ($("#mat-epsg").value) fd.append("epsg", $("#mat-epsg").value);
-    carregando("#mat-res", "Analisando a matrícula…");
-    const r = await (await api("api/matricula/analisar", { method: "POST", body: fd })).json();
-    estado.matricula = r; renderMatricula(r);
-  } catch (e) { erro("#mat-res", e); }
+  fd.append("texto", lido.texto);
+  if (epsg) fd.append("epsg", epsg);
+  aviso("Analisando a matrícula…");
+  const r = await (await api("api/matricula/analisar", { method: "POST", body: fd })).json();
+  estado.matricula = r; estado.masterplan = null; camadaMp.clearLayers();
+  renderMatricula(r);
+  return r;
+}
+$("#mat-ir").onclick = async () => {
+  try { await analisarMatricula({ arq: $("#mat-arq").files[0], texto: $("#mat-txt").value, epsg: $("#mat-epsg").value, aviso: t => carregando("#mat-res", t) }); }
+  catch (e) { erro("#mat-res", e); }
 };
 
 function renderMatricula(r) {
@@ -651,6 +692,8 @@ function renderMatricula(r) {
       ${r.segmentos.length ? `<details open><summary>Lances (${r.segmentos.length})</summary><table><tr><th>Lance</th><th>Azimute</th><th>Dist. (m)</th><th>Confrontante</th></tr>${segs}</table></details>` : ""}
       ${r.medidas.length ? `<table>${r.medidas.map(m => `<tr><th>${esc(m.lado)}</th><td>${m.medida_m != null ? fmt(m.medida_m) + " m" : ""}</td><td>${esc(m.confrontacao)}</td></tr>`).join("")}</table>` : ""}
     </div>` : ""}`;
+  if ($("#wz-ajuste")) $("#wz-ajuste").innerHTML = r.posicao ? controlesPosicao(r) : "";
+  wzAtualizar();
   if (r.diretrizes && $("#dir-ajuste")) {
     $("#dir-ajuste").innerHTML = r.posicao
       ? (r.croqui ? `<div class="alerta" style="border-left-color:var(--info);background:var(--info-soft);margin-top:12px">O documento não traz coordenadas: alinhe o croqui arrastando o marcador ✥ até o córrego, a ferrovia e as quadras coincidirem com o satélite.</div>` : "") + controlesPosicao(r)
@@ -938,22 +981,24 @@ async function concluirDesenho(r) {
 }
 
 // ---------- diretrizes
-$("#dir-ir").onclick = async () => {
+async function analisarDiretrizes({ arq, texto, aviso, vincularMatricula = false }) {
+  const t = arq ? (await textoDoArquivo(arq, aviso)).texto : texto || "";
+  if (!t.trim()) throw new Error("Escolha um arquivo ou cole o texto da consulta.");
+  if (arq) $("#dir-txt").value = t;
   const fd = new FormData();
-  try {
-    const arq = $("#dir-arq").files[0];
-    const texto = arq ? (await textoDoArquivo(arq, t => carregando("#dir-res", t))).texto : $("#dir-txt").value;
-    if (!texto.trim()) throw new Error("Escolha um arquivo ou cole o texto da consulta.");
-    if (arq) $("#dir-txt").value = texto;
-    fd.append("texto", texto);
-    // o PDF vai junto para extrair o croqui vetorial (limite de envio da Vercel: 4,5 MB)
-    if (arq && /\.pdf$/i.test(arq.name) && arq.size < 4.3e6) fd.append("arquivo", arq);
-    carregando("#dir-res", "Analisando as diretrizes…");
-    const d = await (await api("api/diretrizes/analisar", { method: "POST", body: fd })).json();
-    renderDiretrizes(d);
-    imovelDasDiretrizes(d);
-    aplicarDiretrizesNoMasterplan(d);
-  } catch (e) { erro("#dir-res", e); }
+  fd.append("texto", t);
+  // o PDF vai junto para extrair o croqui vetorial (limite de envio da Vercel: 4,5 MB)
+  if (arq && /\.pdf$/i.test(arq.name) && arq.size < 4.3e6) fd.append("arquivo", arq);
+  aviso("Analisando a consulta do IPPUL…");
+  const d = await (await api("api/diretrizes/analisar", { method: "POST", body: fd })).json();
+  renderDiretrizes(d);
+  await imovelDasDiretrizes(d, vincularMatricula);
+  aplicarDiretrizesNoMasterplan(d);
+  return d;
+}
+$("#dir-ir").onclick = async () => {
+  try { await analisarDiretrizes({ arq: $("#dir-arq").files[0], texto: $("#dir-txt").value, aviso: t => carregando("#dir-res", t) }); }
+  catch (e) { erro("#dir-res", e); }
 };
 
 const ROTULOS_CARAC = { lote: "Lote", gleba: "Gleba", quadra: "Quadra", loteamento: "Loteamento", area_total_m2: "Área total", lote_origem: "Lote de origem",
@@ -1000,11 +1045,16 @@ function renderDiretrizes(d) {
 }
 
 // imóvel da consulta: reaproveita a matrícula analisada (mesmo imóvel) ou cria um a partir da caracterização
-function imovelDasDiretrizes(d) {
+function imovelDasDiretrizes(d, vincularMatricula = false) {
   const c = d.caracterizacao || {};
   const dig = v => String(v || "").replace(/\D/g, "");
   let r = estado.matricula;
-  const mesma = r && (!c.matricula || dig(c.matricula) === dig(r.numero)) && (!c.area_total_m2 || !areaReferencia(r) || Math.abs(areaReferencia(r) - c.area_total_m2) / c.area_total_m2 < 0.1);
+  const areaParecida = !c.area_total_m2 || !areaReferencia(r || {}) || Math.abs(areaReferencia(r) - c.area_total_m2) / c.area_total_m2 < 0.1;
+  const mesma = r && (vincularMatricula || ((!c.matricula || dig(c.matricula) === dig(r.numero)) && areaParecida));
+  if (r && vincularMatricula && !areaParecida) {
+    r.alertas = (r.alertas || []).filter(a => !a.startsWith("Área da consulta"));
+    r.alertas.unshift(`Área da consulta do IPPUL (${fmt(c.area_total_m2)} m²) difere da matrícula (${fmt(areaReferencia(r))} m²): confira se os documentos são do mesmo imóvel.`);
+  }
   if (!mesma) {
     r = { numero: c.matricula ? String(c.matricula) : null, cartorio: null, comarca: "LONDRINA", tipo_imovel: c.gleba ? "gleba" : "urbano",
       lote: c.lote || null, quadra: c.quadra || null, loteamento: c.loteamento || (c.gleba ? `Gleba ${c.gleba}` : null), endereco: null, cep: null,
@@ -1014,11 +1064,13 @@ function imovelDasDiretrizes(d) {
   r.diretrizes = d; r.croqui = d.croqui || null;
   r.alertas = (r.alertas || []).filter(a => !a.startsWith("Imóvel da consulta"));
   r.alertas.push(`Imóvel da consulta ${d.numero_consulta || ""} do IPPUL${c.lote ? ` (lote ${c.lote}${c.gleba ? ", gleba " + c.gleba : ""})` : ""}.`);
-  if (d.croqui && (!r.geojson || r.posicao)) {
+  const formaSoReferencia = !r.forma || /quadrado/.test(r.forma.fonte || "") || /croqui/.test(r.forma.fonte || "");
+  if (d.croqui && (!r.geojson || (r.posicao && formaSoReferencia))) {
     // o croqui define a forma do lote (norte para cima); a posição vem da localização ou de um ajuste anterior
     r.forma = { pontos_m: d.croqui.lote_m, orientacao: "fixa", fonte: "croqui do IPPUL (escala pela área total)", avisos: [d.croqui.aviso] };
     if (r.posicao) { r.posicao.rot = 0; estado.matricula = r; return reposicionar(r); }
   } else if (d.croqui && r.geojson) {
+    // matrícula com coordenadas ou medidas: o contorno dela prevalece e o croqui é encaixado sobre ele
     // matrícula com coordenadas: encaixa o croqui sobre o polígono da matrícula
     const cs = r.geojson.geometry.coordinates[0].slice(0, -1);
     r.croquiPos = { lat: cs.reduce((s, q) => s + q[1], 0) / cs.length, lon: cs.reduce((s, q) => s + q[0], 0) / cs.length, rot: 0 };
@@ -1175,33 +1227,164 @@ async function montarMasterplan() {
   const s = await schemas();
   montarForm("#mp-form", s.ParametrosMasterplan, ["perimetro_utm", "epsg", "exclusoes_utm", "cursos_dagua_utm", "vias_previstas", "fundo_vale_utm", "hidrografia_utm"]);
 }
-$("#mp-ir").onclick = async () => {
+async function gerarMasterplan() {
   atualizarOrigemMp();
-  if (!perimetroMp) return erro("#mp-res", "Sem perímetro: analise uma matrícula com coordenadas ou use o exemplo.");
+  if (!perimetroMp) throw new Error("Sem perímetro: analise uma matrícula e confirme o contorno do imóvel no mapa (ou use o exemplo).");
+  const { resumo: _r, ...dirMp } = diretrizesMp || {};
+  const body = { ...lerForm("#mp-form"), perimetro_utm: perimetroMp, epsg: epsgMp, cursos_dagua_utm: estado.cursos || [], ...dirMp };
+  const m = await (await api("api/masterplan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
+  estado.masterplan = m;
+  $("#mp-res").innerHTML = `<div class="card"><h2>Resultado</h2>${alertasHTML(m.alertas)}${quadroMasterplan(m.resumo)}<div id="mp-svg" style="margin-top:12px">${m.svg}</div>
+    <button class="btn" id="mp-kml">Baixar KML (Google Earth)</button><button class="btn sec" id="mp-svgdl">Baixar imagem (SVG)</button><button class="btn sec" id="mp-via">Levar para viabilidade</button></div>`;
+  desenharMasterplan(m, true);
+  $("#mp-kml").onclick = () => baixarKmlMasterplan(m);
+  $("#mp-svgdl").onclick = () => baixar(new Blob([m.svg], { type: "image/svg+xml" }), "masterplan.svg");
+  $("#mp-via").onclick = () => levarParaViabilidade(m);
+  return m;
+}
+$("#mp-ir").onclick = async () => { try { await gerarMasterplan(); } catch (e) { erro("#mp-res", e); } };
+
+function quadroMasterplan(r) {
+  return `<div class="kpis">
+    <div class="kpi"><small>Lotes</small><b>${r.numero_lotes}</b></div>
+    <div class="kpi"><small>Lote médio</small><b>${fmt(r.lote_medio_m2, 0)} m²</b></div>
+    <div class="kpi"><small>Área em lotes</small><b>${fmt(r.pct_lotes, 1)}%</b></div>
+    <div class="kpi"><small>Vias${r.area_vias_diretriz_m2 ? " (inclui previstas)" : ""}</small><b>${fmt(r.pct_vias, 1)}%</b></div>
+    <div class="kpi"><small>Área verde</small><b>${fmt(r.pct_verde, 1)}%</b></div>
+    <div class="kpi"><small>Institucional</small><b>${fmt(r.pct_institucional, 1)}%</b></div>
+    <div class="kpi"><small>APP / fundo de vale</small><b>${fmt(r.area_app_m2, 0)} m²</b></div>
+  </div>`;
+}
+const baixarKmlMasterplan = async m => baixar(await (await api("api/geo/kml-features", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome: "Masterplan", features: m.features }) })).blob(), "masterplan.kml");
+async function levarParaViabilidade(m) {
+  document.querySelector('[data-aba="viabilidade"]').click(); $("#via-tipo").value = "loteamento"; await montarViabilidade();
+  const r = m.resumo, set = (k, v) => { const i = document.querySelector(`#via-form [data-campo="${k}"]`); if (i) i.value = v; };
+  set("area_gleba_m2", Math.round(r.area_gleba_m2)); set("area_app_m2", Math.round(r.area_app_m2));
+  set("pct_sistema_viario", (r.area_vias_m2 / r.area_util_m2 * 100).toFixed(1)); set("pct_area_verde", (r.area_verde_m2 / r.area_util_m2 * 100).toFixed(1));
+  set("pct_institucional", (r.area_institucional_m2 / r.area_util_m2 * 100).toFixed(1)); set("area_media_lote_m2", r.lote_medio_m2.toFixed(0));
+}
+
+// masterplan no mapa com demarcações: quadras, lotes (número e área), áreas públicas, vias previstas, APP
+const camadaRotulosMp = L.layerGroup().addTo(mapa);
+const NOMES_TIPO = { area_verde: "Área verde", institucional: "Institucional", app: "APP / fundo de vale", remanescente: "Remanescente" };
+function desenharMasterplan(m, ajustar = false) {
+  camadaMp.clearLayers(); camadaRotulosMp.clearLayers();
+  const g = L.geoJSON({ type: "FeatureCollection", features: m.features }, {
+    style: f => ({ color: f.properties.diretriz ? "#ff7f00" : "#444", weight: f.properties.tipo === "lote" ? .6 : f.properties.diretriz ? 2 : 1,
+      fillColor: CORES[f.properties.tipo] || "#ccc", fillOpacity: f.properties.tipo === "app" ? .45 : .8, dashArray: f.properties.diretriz ? "6 4" : null }),
+    onEachFeature: (f, l) => l.bindTooltip(`${esc(f.properties.nome)} — ${fmt(f.properties.area_m2)} m²`),
+  }).addTo(camadaMp);
+  const centro = f => L.geoJSON(f).getBounds().getCenter();
+  const rotulo = (ll, html, cls = "medida") => L.tooltip({ permanent: true, direction: "center", className: cls, interactive: false }).setLatLng(ll).setContent(html);
+  // quadras: rótulo no centro do conjunto de lotes
+  const quadras = {};
+  m.features.filter(f => f.properties.tipo === "lote").forEach(f => (quadras[f.properties.quadra] ||= []).push(f));
+  const rotLotes = L.layerGroup(), rotQuadras = L.layerGroup(), rotAreas = L.layerGroup();
+  Object.entries(quadras).forEach(([q, fs]) => {
+    rotulo(L.geoJSON({ type: "FeatureCollection", features: fs }).getBounds().getCenter(), `<b>${q}</b> · ${fs.length} lotes`, "medida medida-area").addTo(rotQuadras);
+    fs.forEach(f => rotulo(centro(f), `${f.properties.nome.split("-")[1]}<br>${fmt(f.properties.area_m2, 0)} m²`, "medida medida-lote").addTo(rotLotes));
+  });
+  m.features.filter(f => f.properties.tipo !== "lote" && (f.properties.area_m2 > 150) && (f.properties.tipo !== "via" || f.properties.diretriz))
+    .forEach(f => rotulo(centro(f), `${esc(f.properties.diretriz ? f.properties.nome : NOMES_TIPO[f.properties.tipo] || f.properties.nome)}<br>${fmt(f.properties.area_m2, 0)} m²`).addTo(rotAreas));
+  // demarcações por nível de zoom, para não poluir: quadras → + áreas → lotes numerados
+  const mostrar = (camada, sim) => sim ? camada.addTo(camadaRotulosMp) : camadaRotulosMp.removeLayer(camada);
+  const atualizar = () => { const z = mapa.getZoom(); mostrar(rotQuadras, z < 18); mostrar(rotAreas, z >= 17); mostrar(rotLotes, z >= 18); };
+  mapa.off("zoomend", desenharMasterplan._z); desenharMasterplan._z = atualizar; mapa.on("zoomend", atualizar); atualizar();
+  if (ajustar) mapa.fitBounds(g.getBounds(), { padding: [30, 30], maxZoom: 18 });
+}
+
+// ---------- NOVO ESTUDO (passo a passo)
+const wz = { etapa: 1, diretrizes: null };
+function wzStatus(n, txt, feita) {
+  const card = $("#wz-" + n); card.classList.toggle("feita", !!feita);
+  $(`#wz-${n}-st`).textContent = txt;
+}
+function wzLiberar(n, sim) { $("#wz-" + n).classList.toggle("bloqueada", !sim); }
+// chamado a cada renderização do imóvel: a etapa 1 só conclui com o imóvel contornado no mapa
+function wzAtualizar() {
+  const r = estado.matricula;
+  if (!r || !$("#wz-1")) return;
+  const contornado = !!r.geojson;
+  wzStatus(1, contornado ? "Concluída" : "Falta o contorno", contornado);
+  wzLiberar(2, contornado);
+  if (!contornado) { wzLiberar(3, false); wzStatus(2, ""); }
+  if ($("#wz-mat-res") && r === wz.matricula) $("#wz-mat-res").innerHTML = wzResumoMatricula(r);
+}
+function wzResumoMatricula(r) {
+  const onus = r.atos.filter(a => a.onus && a.situacao.startsWith("ativo")).length;
+  const ref = areaReferencia(r);
+  const linhas = [["Matrícula", r.numero], ["Imóvel", [r.unidade_autonoma?.unidade, r.lote && `lote ${r.lote}`, r.quadra && `quadra ${r.quadra}`, r.loteamento].filter(Boolean).join(", ")],
+    ["Endereço", r.endereco], ["Área", ref && `${fmt(ref)} m²${r.unidade_autonoma ? " (terreno do condomínio)" : ""}`],
+    ["Contorno no mapa", r.geojson ? `${fmt(r.area_calculada_m2)} m² — ${r.datum || ""}` : "pendente"]].filter(x => x[1]);
+  return `<div class="kpis" style="margin-top:14px">
+      <div class="kpi"><small>Atos</small><b>${r.atos.length}</b></div><div class="kpi"><small>Ônus ativos</small><b>${onus}</b></div>
+      <div class="kpi"><small>Alertas</small><b>${r.alertas.length}</b></div></div>
+    <table style="margin-top:8px">${linhas.map(([k, v]) => `<tr><th>${k}</th><td>${esc(v)}</td></tr>`).join("")}</table>
+    ${r.geojson ? `<p class="muted" style="margin-top:8px">Confira no satélite se o contorno está no lugar certo. ${r.posicao ? "Ajuste arrastando o marcador ✥ ou com os botões abaixo." : ""}</p><div id="wz-ajuste">${r.posicao ? controlesPosicao(r) : ""}</div>`
+      : `<div class="alerta">A matrícula não permitiu montar o contorno automaticamente. Abra a aba <b>Matrícula</b> e use <b>Contornar terreno</b>; depois volte aqui.</div>`}
+    <button class="btn sec" id="wz-ver-mat">Ver análise completa da matrícula</button>`;
+}
+$("#wz-mat-ir").onclick = async () => {
+  const arq = $("#wz-mat-arq").files[0];
+  if (!arq) return erro("#wz-mat-res", "Escolha o PDF da matrícula.");
   try {
-    const { resumo: _r, ...dirMp } = diretrizesMp || {};
-    const body = { ...lerForm("#mp-form"), perimetro_utm: perimetroMp, epsg: epsgMp, cursos_dagua_utm: estado.cursos || [], ...dirMp };
-    const m = await (await api("api/masterplan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
-    estado.masterplan = m;
-    $("#mp-res").innerHTML = `<div class="card"><h2>Resultado</h2>${alertasHTML(m.alertas)}<div id="mp-svg">${m.svg}</div>
-      <button class="btn" id="mp-kml">Baixar KML (Google Earth)</button><button class="btn sec" id="mp-svgdl">Baixar imagem (SVG)</button><button class="btn sec" id="mp-via">Levar para viabilidade</button></div>`;
-    camadaMp.clearLayers();
-    const g = L.geoJSON({ type: "FeatureCollection", features: m.features }, {
-      style: f => ({ color: "#444", weight: f.properties.tipo === "lote" ? .5 : 1, fillColor: CORES[f.properties.tipo] || "#ccc", fillOpacity: .75 }),
-      onEachFeature: (f, l) => l.bindTooltip(`${esc(f.properties.nome)} — ${fmt(f.properties.area_m2)} m²`),
-    }).addTo(camadaMp);
-    mapa.fitBounds(g.getBounds());
-    $("#mp-kml").onclick = async () => baixar(await (await api("api/geo/kml-features", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome: "Masterplan", features: m.features }) })).blob(), "masterplan.kml");
-    $("#mp-svgdl").onclick = () => baixar(new Blob([m.svg], { type: "image/svg+xml" }), "masterplan.svg");
-    $("#mp-via").onclick = async () => {
-      document.querySelector('[data-aba="viabilidade"]').click(); $("#via-tipo").value = "loteamento"; await montarViabilidade();
-      const r = m.resumo, set = (k, v) => { const i = document.querySelector(`[data-campo="${k}"]`); if (i) i.value = v; };
-      set("area_gleba_m2", Math.round(r.area_gleba_m2)); set("area_app_m2", Math.round(r.area_app_m2));
-      set("pct_sistema_viario", (r.area_vias_m2 / r.area_util_m2 * 100).toFixed(1)); set("pct_area_verde", (r.area_verde_m2 / r.area_util_m2 * 100).toFixed(1));
-      set("pct_institucional", (r.area_institucional_m2 / r.area_util_m2 * 100).toFixed(1)); set("area_media_lote_m2", r.lote_medio_m2.toFixed(0));
-    };
-  } catch (e) { erro("#mp-res", e); }
+    wz.diretrizes = null; wzLiberar(3, false); wzStatus(2, ""); wzStatus(3, ""); $("#wz-dir-res").innerHTML = ""; $("#wz-mp-res").innerHTML = "";
+    const r = await analisarMatricula({ arq, aviso: t => carregando("#wz-mat-res", t) });
+    wz.matricula = r;
+    wzAtualizar();
+    if (r.geojson) ligarControlesPosicao(r);
+    $("#wz-ver-mat").onclick = () => document.querySelector('[data-aba="matricula"]').click();
+  } catch (e) { erro("#wz-mat-res", e); }
 };
+// a localização/contorno automático termina depois da análise: atualiza o resumo quando ficar pronto
+const _renderMatricula = renderMatricula;
+renderMatricula = function (r) {
+  _renderMatricula(r);
+  if (wz.matricula === r && $("#wz-mat-res") && !$("#wz-mat-res").querySelector(".muted:only-child")) {
+    $("#wz-mat-res").innerHTML = wzResumoMatricula(r);
+    if ($("#wz-ver-mat")) $("#wz-ver-mat").onclick = () => document.querySelector('[data-aba="matricula"]').click();
+    if (r.geojson) ligarControlesPosicao(r);
+  }
+};
+$("#wz-dir-ir").onclick = async () => {
+  const arq = $("#wz-dir-arq").files[0];
+  if (!estado.matricula?.geojson) return erro("#wz-dir-res", "Conclua a etapa 1 (matrícula com o imóvel contornado no mapa).");
+  if (!arq) return erro("#wz-dir-res", "Escolha o PDF da consulta do IPPUL.");
+  try {
+    const d = await analisarDiretrizes({ arq, aviso: t => carregando("#wz-dir-res", t), vincularMatricula: true });
+    wz.diretrizes = d;
+    const c = d.caracterizacao || {};
+    $("#wz-dir-res").innerHTML = `<table style="margin-top:12px">
+        ${[["Consulta", `CPS ${d.numero_consulta || "—"}`], ["Lote / gleba", [c.lote, c.gleba].filter(Boolean).join(" — ")], ["Área total", c.area_total_m2 && `${fmt(c.area_total_m2)} m²`],
+          ["Zonas", d.zonas.join(", ")], ["Vias previstas", d.vias.map(v => `${v.via} ${v.hierarquia.toLowerCase()} ${fmt(v.largura_total_m, 0)} m`).join("; ")],
+          ["Áreas públicas", d.parametros.areas_publicas_min_pct && `${fmt(d.parametros.areas_publicas_min_pct, 0)}%`], ["Croqui", d.croqui ? "encaixado sobre o imóvel" : "não encontrado no PDF"]]
+          .filter(x => x[1]).map(([k, v]) => `<tr><th>${k}</th><td>${esc(v)}</td></tr>`).join("")}</table>
+      ${alertasHTML(estado.matricula.alertas.filter(a => a.startsWith("Área da consulta")))}
+      <button class="btn sec" id="wz-ver-dir">Ver diretrizes completas</button>`;
+    $("#wz-ver-dir").onclick = () => document.querySelector('[data-aba="diretrizes"]').click();
+    wzStatus(2, "Concluída", true);
+    await wzGerarMasterplan();
+  } catch (e) { erro("#wz-dir-res", e); }
+};
+async function wzGerarMasterplan() {
+  wzLiberar(3, true); wzStatus(3, "Gerando…");
+  carregando("#wz-mp-res", "Gerando o masterplan com as diretrizes…");
+  try {
+    const m = await gerarMasterplan();
+    $("#wz-mp-res").innerHTML = `${alertasHTML(m.alertas)}
+      <p class="muted" style="margin:0 0 10px">${$("#mp-origem").innerHTML}</p>
+      ${quadroMasterplan(m.resumo)}
+      <div class="mp-svg" style="margin-top:12px">${m.svg}</div>
+      <p class="muted">No mapa: quadras e áreas identificadas; aproxime o zoom para ver o número e a área de cada lote.</p>
+      <button class="btn" id="wz-mp-kml">Baixar KML (Google Earth)</button><button class="btn sec" id="wz-mp-via">Levar para viabilidade</button>
+      <button class="btn sec" id="wz-mp-refazer">Gerar de novo</button><button class="btn sec" id="wz-mp-param">Ajustar parâmetros</button>`;
+    $("#wz-mp-kml").onclick = () => baixarKmlMasterplan(m);
+    $("#wz-mp-via").onclick = () => levarParaViabilidade(m);
+    $("#wz-mp-refazer").onclick = wzGerarMasterplan;
+    $("#wz-mp-param").onclick = () => document.querySelector('[data-aba="masterplan"]').click();
+    wzStatus(3, "Concluída", true);
+  } catch (e) { wzStatus(3, "Erro"); erro("#wz-mp-res", e); }
+}
 
 // ---------- REURB
 $("#re-ir").onclick = async () => {

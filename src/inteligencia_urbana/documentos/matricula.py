@@ -484,7 +484,7 @@ def analisar_matricula(texto: str, epsg: int | None = None) -> ResultadoMatricul
     r.cartorio = _primeiro(r"(\d+\s*[º°ªo]?\s*(?:of[íi]cio|servi[çc]o|registro)[^\n]{0,60}?registro\s+de\s+im[óo]veis)", texto)
     r.comarca = _primeiro(r"comarca\s+de\s+([A-ZÀ-Úa-zà-ú\s]+?)(?:\s*[-–/,.\n]|\s+estado)", texto) or _primeiro(
         r"registro\s+de\s+im[óo]veis\s+de\s+([A-ZÀ-Ú][A-ZÀ-Úa-zà-ú ]{2,40}?)\s*[-–/]\s*[A-Z]{2}\b", texto)
-    r.lote = _primeiro(r"\blote\s+(?:de\s+terreno\s+)?(?:urbano\s+)?(?:n[º°o.]*\s*|sob\s+n[º°o.]*\s*)?([\w\-/]*\d[\w\-/]*)", texto)
+    r.lote = _primeiro(r"\blote\s+(?:de\s+terr(?:eno|as)\s+)?(?:urbano\s+|rural\s+)?(?:n[º°o.]*\s*|sob\s+n[º°o.]*\s*)?([\w\-/]*\d[\w\-/]*)", texto)
     # em Londrina e região, "Data de terras" é o lote
     r.lote = r.lote or _primeiro(r"\bdata\s+(?:de\s+terras?\s*,?\s*)?(?:sob\s+)?n[º°o.]*\s*(\d+[A-Z]?)", texto)
     r.quadra = _primeiro(r"\bquadra\s+(?:n[º°o.]*\s*)?([\w\-/]*\d[\w\-/]*|[A-Z]\b)", texto)
