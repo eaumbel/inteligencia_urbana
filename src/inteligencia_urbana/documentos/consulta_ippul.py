@@ -17,7 +17,7 @@ from ..geo.coordenadas import parse_numero_br
 
 NUM = r"\d[\d.]*(?:,\d+)?"
 
-ZONA_RE = re.compile(r"\b(Z[A-Z]{1,4}[\s\-]?\d{0,2}[A-Z]?|ZEIS[\s\-]?\d?|ZEPP?|ZUE|ZEU|MZ[A-Z]{1,3})\b")
+ZONA_RE = re.compile(r"\b(?!ZONA\b)(Z[A-Z]{1,4}[\s\-]?\d{1,2}[A-Z]?|ZEIS[\s\-]?\d?|ZEPP?|ZUE|ZEU|MZ[A-Z]{1,3})\b")
 
 TEMAS = {
     "sistema_viario": r"via\s+(?:arterial|coletora|local|estrutural|marginal)|diretriz(?:es)?\s+vi[áa]ri|caixa\s+de\s+via|prolongamento",
@@ -33,6 +33,13 @@ TEMAS = {
 @dataclass
 class DiretrizesParcelamento:
     numero_consulta: str | None = None
+    processo_sei: str | None = None
+    caracterizacao: dict = field(default_factory=dict)  # lote, gleba, área total, modalidade, finalidade...
+    vias: list[dict] = field(default_factory=list)  # tabela de vias com hierarquia e larguras
+    parametros: dict = field(default_factory=dict)  # faixa de transição, quadra máxima, áreas públicas...
+    legislacao: list[str] = field(default_factory=list)
+    orgaos_consultar: list[str] = field(default_factory=list)
+    croqui: dict | None = None
     zonas: list[str] = field(default_factory=list)
     macrozona: str | None = None
     lote_minimo_m2: float | None = None
@@ -52,10 +59,85 @@ def _frases(texto: str) -> list[str]:
     return [re.sub(r"\s+", " ", p).strip() for p in partes if len(p.strip()) > 15]
 
 
+def _caracterizacao(texto: str) -> dict:
+    """Quadro "CARACTERIZAÇÃO DO OBJETO DA CONSULTA" (lote, gleba, área total...)."""
+    def campo(rotulo, fim=r"(?=\s+[A-ZÀ-Úa-zà-ú][\wÀ-ú. ]{2,40}:|\n|$)"):
+        m = re.search(rotulo + r"\s*:\s*(.+?)" + fim, texto, re.I)
+        return m.group(1).strip(" .-") if m else None
+
+    area = re.search(rf"[ÁA]rea\s+total\s*:\s*({NUM})\s*(?:m²|m2)", texto, re.I)
+    c = {
+        "lote": campo(r"\bLote(?!\s+de\s+origem)"),
+        "gleba": campo(r"\bGleba"),
+        "quadra": campo(r"\bQuadra"),
+        "loteamento": campo(r"\bLoteamento(?!\s+Aberto)"),
+        "area_total_m2": parse_numero_br(area.group(1)) if area else None,
+        "lote_origem": campo(r"Lote\s+de\s+origem"),
+        "matricula": campo(r"Matr[íi]cula(?:\s+n[º°o.]*)?"),
+        "inscricao_imobiliaria": campo(r"Inscri[çc][ãa]o(?:\s+imobili[áa]ria)?"),
+        "modalidade": campo(r"Modalidade", r"(?=\s+Finalidade\s*:|\n\S+:|$)"),
+        "finalidade": campo(r"Finalidade"),
+        "n_lotes_estimado": campo(r"N[º°o.]*\s+estimado\s+de\s+lotes"),
+        "mapa_vinculado": campo(r"Mapa\s+vinculado"),
+    }
+    if c["modalidade"]:  # "Loteamento Aberto, Condomínio\nUrbanístico"
+        m = re.search(r"Modalidade\s*:\s*(.+?)(?:\s+Finalidade\s*:.*?)?\n(\w+)\s*\n", texto)
+        if m and m.group(2) in ("Urbanístico", "Urbanistico", "Fechado", "Horizontal", "Industrial"):
+            c["modalidade"] = (m.group(1).strip() + " " + m.group(2)).strip()
+    if c["n_lotes_estimado"] and re.search(r"N[º°o.]*\s+estimado", c["n_lotes_estimado"]):
+        c["n_lotes_estimado"] = None
+    return {k: v for k, v in c.items() if v not in (None, "", "-")}
+
+
+def _vias(texto: str) -> list[dict]:
+    """Tabela "LARGURA DAS VIAS DE CIRCULAÇÃO" (VIA 01 Coletora 20,00m ...)."""
+    out = []
+    for m in re.finditer(rf"\bVIA\s+(\d{{1,2}})\s+(Arterial|Coletora|Local|Estrutural|Expressa|Marginal|Ciclovia)\s+({NUM})\s*m\b((?:\s+{NUM}\s*m)*)",
+                         texto, re.I):
+        partes = [parse_numero_br(x) for x in re.findall(rf"({NUM})\s*m", m.group(4))]
+        via = {"via": f"VIA {int(m.group(1)):02d}", "hierarquia": m.group(2).capitalize(), "largura_total_m": parse_numero_br(m.group(3))}
+        if len(partes) >= 2:
+            via["calcada_m"], via["pista_m"] = partes[0], partes[1]
+        if any(v["via"] == via["via"] for v in out):
+            continue
+        out.append(via)
+    return out
+
+
+def _parametros(texto: str) -> dict:
+    t = re.sub(r"\s+", " ", texto)
+    def num(padrao):
+        m = re.search(padrao, t, re.I)
+        return parse_numero_br(m.group(1)) if m else None
+    p = {
+        "faixa_transicao_m": num(rf"faixa\s+de\s+transi[çc][ãa]o\s+de,?\s*(?:no\s+m[íi]nimo,?\s*)?({NUM})\s*m"),
+        "quadra_max_m": num(rf"maior\s+dimens[ãa]o\s+das\s+quadras\s+n[ãa]o\s+poder[áa]\s+ser\s+superior\s+a\s+({NUM})\s*m"),
+        "distancia_coletoras_max_m": num(rf"vias\s+coletoras\s+devem\s+apresentar\s+entre\s+si\s+uma\s+dist[âa]ncia\s+nunca\s+superior\s+a\s+({NUM})\s*m"),
+        "areas_publicas_min_pct": num(rf"no\s+m[íi]nimo,?\s*({NUM})\s*%\s*(?:\([^)]*\))?\s*da\s+[áa]rea\s+comput[áa]vel"),
+        "declividade_max_pct": num(rf"declividade\s+igual\s+ou\s+superior\s+a\s+({NUM})\s*%"),
+        "circulo_minimo_area_publica_m": num(rf"inscrito\s+um\s+c[íi]rculo\s+de\s+({NUM})\s*m"),
+        "validade_dias": num(r"validade\s+de\s+(\d+)\s+dias"),
+    }
+    return {k: v for k, v in p.items() if v is not None}
+
+
 def analisar_consulta_parcelamento(texto: str) -> DiretrizesParcelamento:
     d = DiretrizesParcelamento()
-    m = re.search(r"(?:consulta|diretriz(?:es)?|protocolo|processo)\s*(?:pr[ée]via\s*)?(?:n[º°o.]*\s*)?[:\-]?\s*([\d./\-]{4,})", texto, re.I)
+    m = re.search(r"\bCPS\s*N[º°o.]*\s*([\d/]+)", texto) or re.search(
+        r"(?:consulta|diretriz(?:es)?|protocolo)\s*(?:pr[ée]via\s*)?(?:de\s+parcelamento\s+do\s+solo\s*)?(?:n[º°o.]*\s*)?[:\-]?\s*(\d[\d./\-]{3,})", texto, re.I)
     d.numero_consulta = m.group(1).strip(".-/") if m else None
+    m = re.search(r"PROCESSO\s+SEI\s*N[º°o.]*\s*([\d./\-]+)", texto, re.I)
+    d.processo_sei = m.group(1).strip(".-") if m else None
+    d.caracterizacao = _caracterizacao(texto)
+    d.vias = _vias(texto)
+    d.parametros = _parametros(texto)
+    leis = sorted(set(re.sub(r"\s+", " ", x) for x in re.findall(
+        r"(?:Lei(?:\s+(?:Municipal|Estadual|Federal|Complementar))?|Decreto(?:\s+Municipal)?)\s+n[º°o.]*\s*\d[\d.]*/\d{4}", texto)))
+    num = lambda x: x.split()[-1]
+    d.legislacao = [l for l in leis if not any(o != l and num(o) == num(l) and len(o) > len(l) for o in leis)]
+    m = re.search(r"OUTROS\s+[ÓO]RG[ÃA]OS\s+P[ÚU]BLICOS.{0,400}", texto, re.I | re.S)
+    if m:
+        d.orgaos_consultar = list(dict.fromkeys(re.findall(r"(Secretaria\s+Municipal\s+d[eoa]s?\s+[A-ZÀ-Úa-zà-ú ]+?\s*-\s*[A-Z]{2,6}|[ÓO]rg[ãa]o\s+respons[áa]vel\s+pela\s+\w+\s*\([^)]*\))", m.group(0))))
 
     zonas = []
     for z in ZONA_RE.findall(texto):
@@ -104,4 +186,13 @@ def analisar_consulta_parcelamento(texto: str) -> DiretrizesParcelamento:
         d.alertas.append("Há menção a licenciamento (IAT/EIV/outorga): incluir prazos e custos no cronograma.")
     if "restricoes" in d.trechos_por_tema:
         d.alertas.append("Há restrições (faixas não edificáveis/rodovia/linha de transmissão): descontar da área aproveitável.")
+    p = d.parametros
+    if p.get("faixa_transicao_m") and any(z.upper().startswith("ZI") for z in d.zonas):
+        d.alertas.append(f"Zona industrial incidente: parcelamento residencial exige faixa de transição de {p['faixa_transicao_m']:.0f} m junto às divisas.")
+    if p.get("areas_publicas_min_pct"):
+        d.alertas.append(f"Áreas públicas (praça + institucional): mínimo de {p['areas_publicas_min_pct']:.0f}% da área computável.")
+    if d.vias:
+        d.alertas.append("Diretrizes viárias: " + "; ".join(f"{v['via']} {v['hierarquia'].lower()} {v['largura_total_m']:.0f} m" for v in d.vias) + ".")
+    if p.get("validade_dias"):
+        d.alertas.append(f"Consulta válida por {p['validade_dias']:.0f} dias a partir da expedição (prorrogável por igual período).")
     return d

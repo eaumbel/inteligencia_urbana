@@ -76,7 +76,27 @@ async def api_matricula(arquivo: UploadFile | None = File(None), texto: str | No
 
 @app.post("/api/diretrizes/analisar", tags=["Documentos"])
 async def api_diretrizes(arquivo: UploadFile | None = File(None), texto: str | None = Form(None)):
-    return analisar_consulta_parcelamento(await _texto(arquivo, texto)).to_dict()
+    """Texto (lido no navegador ou extraído aqui) + croqui vetorial do PDF, quando houver."""
+    dados = await arquivo.read() if arquivo is not None and arquivo.filename else None
+    if texto:
+        conteudo = normalizar_texto(texto)
+    elif dados is not None:
+        await arquivo.seek(0)
+        conteudo = await _texto(arquivo, None)
+    else:
+        raise HTTPException(400, "Envie um arquivo (PDF/TXT) ou o texto.")
+    d = analisar_consulta_parcelamento(conteudo)
+    area = d.caracterizacao.get("area_total_m2")
+    if dados and area and (arquivo.filename or "").lower().endswith(".pdf"):
+        from ..documentos.croqui import extrair_croqui_pdf
+
+        try:
+            d.croqui = extrair_croqui_pdf(dados, area)
+        except Exception as e:  # PDF sem croqui vetorial: segue sem ele
+            d.alertas.append(f"Não foi possível ler o croqui do PDF ({type(e).__name__}).")
+    if dados and area and not d.croqui:
+        d.alertas.append("Croqui vetorial do lote não encontrado no PDF: contorne a área manualmente no mapa.")
+    return d.to_dict()
 
 
 # ------------------------------------------------------------------ geo / Google Earth

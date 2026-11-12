@@ -651,8 +651,15 @@ function renderMatricula(r) {
       ${r.segmentos.length ? `<details open><summary>Lances (${r.segmentos.length})</summary><table><tr><th>Lance</th><th>Azimute</th><th>Dist. (m)</th><th>Confrontante</th></tr>${segs}</table></details>` : ""}
       ${r.medidas.length ? `<table>${r.medidas.map(m => `<tr><th>${esc(m.lado)}</th><td>${m.medida_m != null ? fmt(m.medida_m) + " m" : ""}</td><td>${esc(m.confrontacao)}</td></tr>`).join("")}</table>` : ""}
     </div>` : ""}`;
+  if (r.diretrizes && $("#dir-ajuste")) {
+    $("#dir-ajuste").innerHTML = r.posicao
+      ? (r.croqui ? `<div class="alerta" style="border-left-color:var(--info);background:var(--info-soft);margin-top:12px">O documento não traz coordenadas: alinhe o croqui arrastando o marcador ✥ até o córrego, a ferrovia e as quadras coincidirem com o satélite.</div>` : "") + controlesPosicao(r)
+      : r.geojson ? `<p class="muted" style="margin-top:10px">Croqui encaixado sobre o polígono da matrícula analisada.</p>`
+      : `<p class="muted" style="margin-top:10px">Localizando… se não for possível, contorne a área na aba <b>Matrícula</b>.</p>`;
+  }
   camadaMat.clearLayers(); camadaCruz.clearLayers(); estado.cursos = null;
   if (r.geojson) {
+    desenharCroqui(r, camadaMat);
     const g = L.geoJSON(r.geojson, { style: { color: corMapa(), weight: 3, fillOpacity: .15 } }).addTo(camadaMat);
     r.geojson.geometry.coordinates[0].slice(0, -1).forEach((c, i) => L.circleMarker([c[1], c[0]], { radius: 4, color: "#fff", fillColor: corMapa(), fillOpacity: 1 })
       .bindTooltip(r.vertices[i]?.nome || "").addTo(camadaMat));
@@ -710,11 +717,38 @@ async function geocodificar(r) {
       if (d.length) return { lat: +d[0].lat, lon: +d[0].lon, precisao, nome: d[0].display_name };
     } catch {}
   }
+  // cidade (para a região e para a busca de hidrografia)
+  let centro = null;
+  try {
+    const d = await (await fetch(base + `city=${encodeURIComponent(cidade)}&state=Paran%C3%A1`)).json();
+    if (d.length) centro = { lat: +d[0].lat, lon: +d[0].lon, bbox: d[0].boundingbox.map(Number) };
+  } catch {}
+  // glebas com nome de curso d'água ("Gleba Ribeirão Jacutinga"): ponto do curso d'água mais próximo do centro
+  const agua = (r.loteamento || "").match(/(Ribeir[ãa]o|C[óo]rrego|Rio|Arroio)\s+(?:d[oae]s?\s+)?(.+)$/i);
+  if (agua && centro && CAM.drenagem) {
+    try {
+      const [s0, n0, w0, e0] = centro.bbox;
+      const feats = await wfsNavegador(CAM.drenagem.wfs, CAM.drenagem.layers, [w0 - .05, s0 - .05, e0 + .05, n0 + .05], 2000);
+      const alvo = agua[2].normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+      let melhor = null;
+      for (const f of feats) {
+        const nome = (f.properties.nome || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        if (!nome.includes(alvo)) continue;
+        const linhas = f.geometry.type === "LineString" ? [f.geometry.coordinates] : f.geometry.coordinates;
+        for (const ln of linhas) for (const [lo, la] of ln) {
+          const d = Math.hypot((lo - centro.lon) * Math.cos(centro.lat * Math.PI / 180), la - centro.lat);
+          if (!melhor || d < melhor.d) melhor = { d, lat: la, lon: lo, nome: f.properties.nome };
+        }
+      }
+      if (melhor) return { lat: melhor.lat, lon: melhor.lon, precisao: `${melhor.nome} (hidrografia IBGE) — posição só da região`, nome: `${r.loteamento}, ${cidade}` };
+    } catch {}
+  }
+  if (centro) return { lat: centro.lat, lon: centro.lon, precisao: "centro da cidade — posição só de referência", nome: cidade };
   return null;
 }
 async function iniciarLocalizacao(r) {
   const ref = areaReferencia(r);
-  $("#mat-local").innerHTML = `<p class="muted">A matrícula não traz coordenadas. Procurando o endereço no mapa…</p>`;
+  $("#mat-local").innerHTML = `<p class="muted">O imóvel não tem coordenadas. Procurando a localização no mapa…</p>`;
   const loc = await geocodificar(r);
   if (estado.matricula !== r) return;
   let html = "";
@@ -769,6 +803,31 @@ async function rumoDaRua(r, loc) {
   } catch { return null; }
 }
 // cantos do terreno em lat/lng a partir da forma (metros) e da posição/rotação escolhidas
+// metros (x = Leste, y = Norte, já centrados no lote) -> [lon, lat], com rotação em graus
+function metrosParaLonLat(en, pos) {
+  const rad = Math.PI / 180, a = 6378137, e2 = 0.00669438, k = 0.9996, t = (pos.rot || 0) * rad;
+  const lat0 = pos.lat * rad, w = 1 - e2 * Math.sin(lat0) ** 2, M = a * (1 - e2) / w ** 1.5, N = a / Math.sqrt(w);
+  return en.map(([x, y]) => {
+    const e = x * Math.cos(t) + y * Math.sin(t), n = -x * Math.sin(t) + y * Math.cos(t);
+    return [pos.lon + e / k / (N * Math.cos(lat0)) / rad, pos.lat + n / k / M / rad];
+  });
+}
+const ESTILO_CROQUI = {
+  via_coletora: { color: "#ff7f00" }, via_arterial: { color: "#ff0000" }, via_local_ferrovia: { color: "#767676" },
+  hidrografia: { color: "#007fff" }, fundo_de_vale: { color: "#3fae5a" }, base_cadastral: { color: "#bdbdbd" },
+};
+const rendererCroqui = L.canvas({ padding: 0.5 });
+function desenharCroqui(r, camada) {
+  const pos = r.posicao || r.croquiPos;
+  if (!r.croqui || !pos) return;
+  const pos0 = { ...pos, rot: pos.rot || 0 };
+  for (const f of r.croqui.feicoes) {
+    const st = ESTILO_CROQUI[f.tipo] || { color: "#999" };
+    const ll = metrosParaLonLat(f.pts, pos0).map(([lo, la]) => [la, lo]);
+    const opc = { renderer: rendererCroqui, interactive: false, color: st.color, weight: f.tipo === "base_cadastral" ? 1 : 2, opacity: f.tipo === "base_cadastral" ? .7 : .95 };
+    (f.geom === "poligono" ? L.polygon(ll, { ...opc, fillColor: st.color, fillOpacity: .9, weight: 0 }) : L.polyline(ll, opc)).addTo(camada);
+  }
+}
 function cantosDaForma(r) {
   const f = r.forma, p = r.posicao, rad = Math.PI / 180, a = 6378137, e2 = 0.00669438;
   const lat0 = p.lat * rad, w = 1 - e2 * Math.sin(lat0) ** 2, M = a * (1 - e2) / w ** 1.5, N = a / Math.sqrt(w);
@@ -886,18 +945,83 @@ $("#dir-ir").onclick = async () => {
     if (!texto.trim()) throw new Error("Escolha um arquivo ou cole o texto da consulta.");
     if (arq) $("#dir-txt").value = texto;
     fd.append("texto", texto);
+    // o PDF vai junto para extrair o croqui vetorial (limite de envio da Vercel: 4,5 MB)
+    if (arq && /\.pdf$/i.test(arq.name) && arq.size < 4.3e6) fd.append("arquivo", arq);
     carregando("#dir-res", "Analisando as diretrizes…");
     const d = await (await api("api/diretrizes/analisar", { method: "POST", body: fd })).json();
-    const temas = Object.entries(d.trechos_por_tema).map(([t, l]) => `<details><summary>${esc(t.replace(/_/g, " "))} (${l.length})</summary><ul>${l.map(x => `<li>${esc(x)}</li>`).join("")}</ul></details>`).join("");
-    $("#dir-res").innerHTML = `<div class="card"><h2>Diretrizes identificadas</h2>${alertasHTML(d.alertas)}
-      <table><tr><th>Consulta</th><td>${esc(d.numero_consulta || "—")}</td></tr><tr><th>Zonas</th><td>${d.zonas.map(z => `<span class="tag">${esc(z)}</span>`).join("") || "—"}</td></tr>
-      <tr><th>Macrozona</th><td>${esc(d.macrozona || "—")}</td></tr><tr><th>Lote mínimo</th><td>${fmt(d.lote_minimo_m2)} m²</td></tr><tr><th>Testada mínima</th><td>${fmt(d.testada_minima_m)} m</td></tr>
-      <tr><th>Áreas públicas</th><td>${Object.entries(d.percentuais_areas).map(([k, v]) => `${esc(k)}: ${fmt(v, 1)}%`).join("<br>") || "—"}</td></tr>
-      <tr><th>Caixas de via</th><td>${d.larguras_vias_m.map(v => fmt(v, 1) + " m").join(", ") || "—"}</td></tr>
-      <tr><th>Faixas</th><td>${d.faixas_m.map(f => `${esc(f.descricao)}: ${fmt(f.largura_m, 1)} m`).join("<br>") || "—"}</td></tr></table></div>
-      <div class="card"><h2>Trechos por tema</h2>${temas || "<p class='muted'>Nenhum.</p>"}</div>`;
+    renderDiretrizes(d);
+    imovelDasDiretrizes(d);
   } catch (e) { erro("#dir-res", e); }
 };
+
+const ROTULOS_CARAC = { lote: "Lote", gleba: "Gleba", quadra: "Quadra", loteamento: "Loteamento", area_total_m2: "Área total", lote_origem: "Lote de origem",
+  matricula: "Matrícula", inscricao_imobiliaria: "Inscrição imobiliária", modalidade: "Modalidade", finalidade: "Finalidade", n_lotes_estimado: "Nº estimado de lotes", mapa_vinculado: "Mapa vinculado" };
+const ROTULOS_PARAM = { faixa_transicao_m: ["Faixa de transição (zona industrial)", "m"], quadra_max_m: ["Maior dimensão da quadra", "m"],
+  distancia_coletoras_max_m: ["Distância máxima entre coletoras", "m"], areas_publicas_min_pct: ["Áreas públicas (praça + institucional)", "%"],
+  declividade_max_pct: ["Declividade máxima para parcelar", "%"], circulo_minimo_area_publica_m: ["Círculo mínimo inscrito em área pública", "m"], validade_dias: ["Validade da consulta", "dias"] };
+function renderDiretrizes(d) {
+  const c = d.caracterizacao || {};
+  const carac = Object.entries(c).map(([k, v]) => `<tr><th>${ROTULOS_CARAC[k] || k}</th><td>${k === "area_total_m2" ? fmt(v) + " m²" : esc(v)}</td></tr>`).join("");
+  const vias = d.vias.length ? `<table><tr><th>Via</th><th>Hierarquia</th><th>Largura</th><th>Calçada</th><th>Pista</th></tr>
+    ${d.vias.map(v => `<tr><td>${esc(v.via)}</td><td>${esc(v.hierarquia)}</td><td><b>${fmt(v.largura_total_m)} m</b></td><td>${v.calcada_m != null ? fmt(v.calcada_m) + " m" : "—"}</td><td>${v.pista_m != null ? fmt(v.pista_m) + " m" : "—"}</td></tr>`).join("")}</table>` : "";
+  const params = Object.entries(d.parametros || {}).map(([k, v]) => `<tr><th>${(ROTULOS_PARAM[k] || [k])[0]}</th><td>${fmt(v, Number.isInteger(v) ? 0 : 2)} ${(ROTULOS_PARAM[k] || [, ""])[1]}</td></tr>`).join("");
+  const temas = Object.entries(d.trechos_por_tema).map(([t, l]) => `<details><summary>${esc(t.replace(/_/g, " "))} (${l.length})</summary><ul>${l.map(x => `<li>${esc(x)}</li>`).join("")}</ul></details>`).join("");
+  const legenda = d.croqui ? `<div class="kpis" style="margin-top:10px">${[["lote", "#e5383f", "Lote da consulta"], ["via_coletora", "#ff7f00", "Via coletora"], ["via_arterial", "#ff0000", "Via arterial"],
+    ["via_local_ferrovia", "#767676", "Via local / ferrovia"], ["hidrografia", "#007fff", "Hidrografia"], ["fundo_de_vale", "#3fae5a", "Fundo de vale"]]
+    .map(([, cor, nome]) => `<div class="kpi" style="display:flex;gap:8px;align-items:center;padding:6px 10px"><i style="width:14px;height:14px;border-radius:3px;background:${cor};flex:none"></i><small style="margin:0">${nome}</small></div>`).join("")}</div>` : "";
+  $("#dir-res").innerHTML = `
+    <div class="card"><h2>Consulta ${esc(d.numero_consulta || "")}${d.processo_sei ? ` <span class="muted" style="font-weight:500">— SEI ${esc(d.processo_sei)}</span>` : ""}</h2>
+      ${alertasHTML(d.alertas)}
+      ${carac ? `<table style="margin-top:8px">${carac}</table>` : ""}
+      ${d.zonas.length ? `<p style="margin:12px 0 4px"><b>Zonas incidentes</b></p>${d.zonas.map(z => `<button class="tag" style="border:0;cursor:pointer" data-zona="${esc(z)}" title="Ver parâmetros da zona">${esc(z)}</button>`).join("")}` : ""}
+    </div>
+    <div class="card" id="dir-mapa"><h2>Área no mapa</h2>
+      ${d.croqui ? `<p class="muted" style="margin:0">O croqui do IPPUL foi colocado no mapa com escala pela área total (${fmt(c.area_total_m2)} m²; ${fmt(d.croqui.escala_m_por_pt, 3)} m por ponto do desenho).</p>${legenda}`
+        : `<p class="muted" style="margin:0">Sem croqui vetorial no documento: a área foi posicionada pela localização disponível.</p>`}
+      <div id="dir-ajuste"></div>
+    </div>
+    ${vias ? `<div class="card"><h2>Sistema viário previsto</h2>${vias}</div>` : ""}
+    ${params ? `<div class="card"><h2>Parâmetros para o parcelamento</h2><table>${params}</table></div>` : ""}
+    ${d.legislacao.length || d.orgaos_consultar.length ? `<div class="card"><h2>Legislação e órgãos</h2>
+      ${d.legislacao.length ? `<ul>${d.legislacao.map(l => `<li>${esc(l)}</li>`).join("")}</ul>` : ""}
+      ${d.orgaos_consultar.length ? `<p style="margin:10px 0 4px"><b>Órgãos a consultar</b></p><ul>${d.orgaos_consultar.map(o => `<li>${esc(o)}</li>`).join("")}</ul>` : ""}</div>` : ""}
+    <div class="card"><h2>Trechos por tema</h2>${temas || "<p class='muted'>Nenhum.</p>"}</div>`;
+  document.querySelectorAll("[data-zona]").forEach(b => b.onclick = async () => {
+    document.querySelector('[data-aba="zoneamento"]').click();
+    $("#zon-cidade").value = "londrina"; await carregarZonas();
+    const op = [...$("#zon-zona").options].find(o => o.value.replace("-", "") === b.dataset.zona.replace("-", ""));
+    if (op) { $("#zon-zona").value = op.value; if (c.area_total_m2) $("#zon-area").value = Math.round(c.area_total_m2); $("#zon-ir").click(); }
+    else $("#zon-status").textContent = `A zona ${b.dataset.zona} ainda não está cadastrada na base de zoneamento.`;
+  });
+}
+
+// imóvel da consulta: reaproveita a matrícula analisada (mesmo imóvel) ou cria um a partir da caracterização
+function imovelDasDiretrizes(d) {
+  const c = d.caracterizacao || {};
+  const dig = v => String(v || "").replace(/\D/g, "");
+  let r = estado.matricula;
+  const mesma = r && (!c.matricula || dig(c.matricula) === dig(r.numero)) && (!c.area_total_m2 || !areaReferencia(r) || Math.abs(areaReferencia(r) - c.area_total_m2) / c.area_total_m2 < 0.1);
+  if (!mesma) {
+    r = { numero: c.matricula ? String(c.matricula) : null, cartorio: null, comarca: "LONDRINA", tipo_imovel: c.gleba ? "gleba" : "urbano",
+      lote: c.lote || null, quadra: c.quadra || null, loteamento: c.loteamento || (c.gleba ? `Gleba ${c.gleba}` : null), endereco: null, cep: null,
+      inscricao_imobiliaria: c.inscricao_imobiliaria || null, area_declarada_m2: c.area_total_m2 || null, unidade_autonoma: null,
+      atos: [], vertices: [], segmentos: [], medidas: [], transmissoes: [], alertas: [], epsg: 31982, forma: null, geojson: null };
+  }
+  r.diretrizes = d; r.croqui = d.croqui || null;
+  r.alertas = (r.alertas || []).filter(a => !a.startsWith("Imóvel da consulta"));
+  r.alertas.push(`Imóvel da consulta ${d.numero_consulta || ""} do IPPUL${c.lote ? ` (lote ${c.lote}${c.gleba ? ", gleba " + c.gleba : ""})` : ""}.`);
+  if (d.croqui && (!r.geojson || r.posicao)) {
+    // o croqui define a forma do lote (norte para cima); a posição vem da localização ou de um ajuste anterior
+    r.forma = { pontos_m: d.croqui.lote_m, orientacao: "fixa", fonte: "croqui do IPPUL (escala pela área total)", avisos: [d.croqui.aviso] };
+    if (r.posicao) { r.posicao.rot = 0; estado.matricula = r; return reposicionar(r); }
+  } else if (d.croqui && r.geojson) {
+    // matrícula com coordenadas: encaixa o croqui sobre o polígono da matrícula
+    const cs = r.geojson.geometry.coordinates[0].slice(0, -1);
+    r.croquiPos = { lat: cs.reduce((s, q) => s + q[1], 0) / cs.length, lon: cs.reduce((s, q) => s + q[0], 0) / cs.length, rot: 0 };
+  }
+  estado.matricula = r;
+  renderMatricula(r);
+}
 
 // ---------- zoneamento
 async function carregarCidades() {

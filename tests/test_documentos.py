@@ -123,3 +123,37 @@ def test_forma_pela_metragem():
 
     com_coordenadas = analisar_matricula((EX / "matricula_gleba.txt").read_text(encoding="utf-8"))
     assert com_coordenadas.forma is None  # já tem vértices georreferenciados
+
+
+def test_consulta_ippul_modelo_2026():
+    d = analisar_consulta_parcelamento((EX / "consulta_ippul_ficticia.txt").read_text(encoding="utf-8"))
+    assert d.numero_consulta == "099/2026" and d.processo_sei == "84.000000/2026-00"
+    c = d.caracterizacao
+    assert (c["lote"], c["gleba"], c["area_total_m2"], c["lote_origem"]) == ("12-A", "Ribeirão Exemplo", 35000, "12")
+    assert c["modalidade"] == "Loteamento Aberto, Condomínio Urbanístico" and c["finalidade"] == "Residencial"
+    assert d.zonas == ["ZR-3", "ZI-2"]  # "ZONA" não é zona
+    assert [(v["via"], v["hierarquia"], v["largura_total_m"]) for v in d.vias] == [("VIA 01", "Coletora", 20), ("VIA 02", "Local", 15)]
+    p = d.parametros
+    assert (p["faixa_transicao_m"], p["quadra_max_m"], p["areas_publicas_min_pct"], p["declividade_max_pct"], p["validade_dias"]) == (100, 250, 12, 30, 180)
+    assert "Secretaria Municipal do Ambiente - SEMA" in d.orgaos_consultar
+    assert any("faixa de transição de 100 m" in a for a in d.alertas)
+
+
+def test_croqui_vetorial_escala_pela_area():
+    from inteligencia_urbana.documentos.croqui import montar_croqui
+
+    cinza, laranja, azul = (0.8588, 0.8588, 0.8588), (1.0, 0.498, 0.0), (0.0, 0.498, 1.0)
+    formas = [
+        {"pts": [(100, 100), (200, 100), (200, 120), (100, 120), (100, 100)], "fill": cinza, "stroke": None},  # lote 100 x 20 pt
+        {"pts": [(300, 600), (320, 600), (320, 608), (300, 608)], "fill": cinza, "stroke": None},  # amostra da legenda
+        {"pts": [(100, 130), (200, 130)], "fill": None, "stroke": laranja},  # via 10 pt ao sul do lote
+        {"pts": [(150, 50), (150, 200)], "fill": None, "stroke": azul},  # córrego norte-sul
+        {"pts": [(10, 10), (10.5, 10)], "fill": None, "stroke": azul},  # traço miúdo (descartado)
+    ]
+    c = montar_croqui(formas, area_total_m2=8000, rotulo_lote=(150, 110), limite_y=550)  # 2000 pt² → 2 m/pt
+    assert c["escala_m_por_pt"] == pytest.approx(2)
+    assert c["lote_m"] == [[-100, 20], [100, 20], [100, -20], [-100, -20]]  # norte para cima
+    tipos = [(f["tipo"], f["pts"]) for f in c["feicoes"]]
+    assert ("via_coletora", [[-100, -40], [100, -40]]) in tipos
+    assert ("hidrografia", [[0, 120], [0, -180]]) in tipos
+    assert len(c["feicoes"]) == 2

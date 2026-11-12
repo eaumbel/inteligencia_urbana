@@ -17,7 +17,8 @@
 ## Fase 2 — Dados oficiais (depende de material do usuário)
 - [ ] Preencher e validar os parâmetros de zoneamento de cada cidade a partir das leis vigentes
 - [ ] Importar os mapas de zoneamento (shapefile/KML do SIGLON e das prefeituras) para descobrir a zona pelo perímetro
-- [ ] Calibrar o leitor de diretrizes com consultas prévias reais do IPPUL
+- [x] Leitor de diretrizes calibrado com Consulta de Parcelamento do Solo real do IPPUL (2026); croqui vetorial no mapa
+- [x] ZR-3 e ZI-2 de Londrina com parâmetros oficiais (Lei 13.905/2024)
 - [ ] Calibrar o leitor de matrícula com certidões reais dos Registros de Imóveis da região
 - [ ] Tabela histórica do CUB-PR (atualização mensal)
 
