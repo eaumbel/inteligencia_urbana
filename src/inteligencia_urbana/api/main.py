@@ -96,6 +96,38 @@ def api_kml(p: PedidoKML):
     return _download_kml(kml, p.nome, p.kmz)
 
 
+class PedidoPoligono(BaseModel):
+    coords_lonlat: list[tuple[float, float]] = Field(..., min_length=3, description="Vértices em (longitude, latitude)")
+    area_referencia_m2: float | None = Field(None, description="Área da matrícula para comparar")
+
+
+@app.post("/api/geo/poligono", tags=["Google Earth"])
+def api_poligono(p: PedidoPoligono):
+    """Converte um contorno desenhado no mapa em vértices UTM, lados, área e perímetro."""
+    from ..geo.coordenadas import epsg_sirgas_utm_sul, geo_para_utm
+    from ..geo.poligono import Perimetro, Vertice, segmentos_de_vertices
+
+    epsg = epsg_sirgas_utm_sul(p.coords_lonlat[0][0])
+    vertices = []
+    for i, (lon, lat) in enumerate(p.coords_lonlat, start=1):
+        e, n = geo_para_utm(lon, lat, epsg)
+        vertices.append(Vertice(f"P{i}", round(e, 3), round(n, 3)))
+    per = Perimetro(vertices, segmentos_de_vertices(vertices), epsg)
+    if not per.poligono().is_valid:
+        raise HTTPException(422, "O contorno se cruza. Desenhe os cantos em sequência, contornando o terreno.")
+    area = per.area_m2
+    dif = (area - p.area_referencia_m2) / p.area_referencia_m2 * 100 if p.area_referencia_m2 else None
+    return {
+        "epsg": epsg,
+        "vertices": [asdict(v) for v in vertices],
+        "segmentos": [asdict(s) for s in per.segmentos],
+        "area_m2": round(area, 2),
+        "perimetro_m": round(per.perimetro_m, 2),
+        "diferenca_pct": round(dif, 2) if dif is not None else None,
+        "geojson": per.geojson(),
+    }
+
+
 class PedidoFeaturesKML(BaseModel):
     nome: str = "Masterplan"
     features: list[dict]

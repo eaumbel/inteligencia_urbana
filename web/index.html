@@ -120,6 +120,11 @@ tr:last-child td,tr:last-child th{border-bottom:0}
 .muted{color:var(--muted);font-size:12.5px}
 details summary{cursor:pointer;color:var(--accent);font-weight:700;margin:10px 0 6px}
 ul{padding-left:20px;margin:6px 0} li{margin:3px 0}
+.leaflet-tooltip.medida{background:rgba(20,22,25,.82);color:#fff;border:0;border-radius:6px;padding:2px 6px;font:700 11.5px/1.3 var(--font-body);box-shadow:none;white-space:nowrap}
+.leaflet-tooltip.medida::before{display:none}
+.leaflet-tooltip.medida-area{background:var(--accent);font-size:12.5px;padding:4px 8px}
+.leaflet-container.desenhando{cursor:crosshair}
+.passos{margin:8px 0 0;padding-left:18px;font-size:13px;color:var(--muted)}
 #mp-svg svg{width:100%;height:auto;border:1px solid var(--line);border-radius:10px;background:#fafafa}
 
 /* ---------- Mapa (Leaflet) no tema do app ---------- */
@@ -380,6 +385,7 @@ async function infoWMS(cfg, latlng) {
   return d.features?.length ? `<div style="margin-top:8px"><b>${esc(cfg.nome)}</b>${d.features.map(f => tabelaProps(f.properties)).join("")}</div>` : "";
 }
 mapa.on("click", async ev => {
+  if (estado.desenho) return adicionarPonto(ev.latlng);
   const { lat, lng } = ev.latlng;
   let html = `<b>${lat.toFixed(6)}, ${lng.toFixed(6)}</b><br>${linksGoogle(lat.toFixed(6), lng.toFixed(6))}`;
   const ativas = [];
@@ -634,7 +640,7 @@ function renderMatricula(r) {
       <table style="margin-top:8px">${id}</table>
       ${r.geojson ? `<button class="btn" id="mat-kml">Baixar KML (Google Earth)</button><button class="btn sec" id="mat-kmz">KMZ</button><button class="btn sec" id="mat-mp">Usar no masterplan</button>
         <div style="margin-top:4px"><button class="btn sec" id="mat-sv">Street View</button><button class="btn sec" id="mat-car">CAR sobrepostos</button><button class="btn sec" id="mat-dren">Córregos próximos (IBGE)</button></div>`
-        : `<p class="muted" style="margin-top:12px">A matrícula não traz coordenadas: o imóvel não pode ser desenhado no mapa automaticamente.</p>`}
+        : `<div id="mat-local" style="margin-top:14px"></div>`}
     </div>
     <div id="mat-cruz"></div>
     ${unidade}
@@ -651,6 +657,8 @@ function renderMatricula(r) {
     r.geojson.geometry.coordinates[0].slice(0, -1).forEach((c, i) => L.circleMarker([c[1], c[0]], { radius: 4, color: "#fff", fillColor: corMapa(), fillOpacity: 1 })
       .bindTooltip(r.vertices[i]?.nome || "").addTo(camadaMat));
     mapa.fitBounds(g.getBounds(), { padding: [30, 30] });
+    desenharMedidas(r.geojson.geometry.coordinates[0].slice(0, -1).map(c => [c[1], c[0]]), r.area_calculada_m2, camadaMat,
+      r.segmentos.length === r.vertices.length ? r.segmentos.map(sg => sg.distancia_m) : null);
     const kml = async kmz => {
       const corpo = { nome: `Matrícula ${r.numero || ""}`.trim(), epsg: r.epsg, vertices: r.vertices, segmentos: r.segmentos, kmz,
         info: { "Matrícula": r.numero || "—", "Área declarada (m²)": fmt(r.area_declarada_m2), "Área calculada (m²)": fmt(r.area_calculada_m2), "Perímetro (m)": fmt(r.perimetro_m) } };
@@ -663,7 +671,118 @@ function renderMatricula(r) {
     $("#mat-car").onclick = cruzarCAR;
     $("#mat-dren").onclick = buscarDrenagem;
     $("#zon-area").value = Math.round(r.area_calculada_m2 || r.area_declarada_m2 || 0);
+  } else {
+    iniciarLocalizacao(r);
   }
+}
+
+// ---------- medidas no mapa (comprimento de cada lado e área)
+function distanciaM(a, b) { return mapa.distance(a, b); }
+function desenharMedidas(pts, area, camada, comprimentos = null) {
+  pts.forEach((p, i) => {
+    const q = pts[(i + 1) % pts.length];
+    if (pts.length < 3 && i === pts.length - 1) return;
+    const meio = L.latLng((p.lat ?? p[0]) / 2 + (q.lat ?? q[0]) / 2, (p.lng ?? p[1]) / 2 + (q.lng ?? q[1]) / 2);
+    L.tooltip({ permanent: true, direction: "center", className: "medida" }).setLatLng(meio)
+      .setContent(`${fmt(comprimentos?.[i] ?? distanciaM(L.latLng(p), L.latLng(q)))} m`).addTo(camada);
+  });
+  if (area && pts.length >= 3) {
+    const centro = L.polygon(pts).getBounds().getCenter();
+    L.tooltip({ permanent: true, direction: "center", className: "medida medida-area" }).setLatLng(centro).setContent(`${fmt(area)} m²`).addTo(camada);
+  }
+}
+
+// ---------- localização pelo endereço (OpenStreetMap/Nominatim) e contorno manual
+const areaReferencia = r => r.unidade_autonoma?.area_terreno_condominio_m2 || r.area_declarada_m2 || null;
+async function geocodificar(r) {
+  const base = "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=br&accept-language=pt-BR&";
+  const cidade = (r.comarca || "Londrina").replace(/\b\w/g, c => c.toUpperCase()).replace(/\B\w/g, c => c.toLowerCase());
+  const rua = r.endereco ? r.endereco.replace(/\s+nº\s*/, " ") : null;
+  const tentativas = [];
+  if (r.cep) tentativas.push(["CEP " + r.cep, `postalcode=${encodeURIComponent(r.cep.replace(".", ""))}`]);
+  if (rua) tentativas.push(["endereço", `street=${encodeURIComponent(rua)}&city=${encodeURIComponent(cidade)}&state=Paran%C3%A1`]);
+  if (rua) tentativas.push(["rua (sem número)", `street=${encodeURIComponent(rua.replace(/\s+\d+\s*$/, ""))}&city=${encodeURIComponent(cidade)}&state=Paran%C3%A1`]);
+  if (r.loteamento) tentativas.push(["bairro/loteamento", `q=${encodeURIComponent(r.loteamento + ", " + cidade + ", PR")}`]);
+  for (const [precisao, q] of tentativas) {
+    try {
+      const d = await (await fetch(base + q)).json();
+      if (d.length) return { lat: +d[0].lat, lon: +d[0].lon, precisao, nome: d[0].display_name };
+    } catch {}
+  }
+  return null;
+}
+async function iniciarLocalizacao(r) {
+  const ref = areaReferencia(r);
+  $("#mat-local").innerHTML = `<p class="muted">A matrícula não traz coordenadas. Procurando o endereço no mapa…</p>`;
+  const loc = await geocodificar(r);
+  if (estado.matricula !== r) return;
+  let html = "";
+  if (loc) {
+    const mk = L.marker([loc.lat, loc.lon]).on("click", e => { if (estado.desenho) { mk.closePopup(); adicionarPonto(e.latlng); } }).addTo(camadaMat)
+      .bindPopup(`<b>Localização aproximada</b><br>pelo ${esc(loc.precisao)}<br><span class="muted">${esc(loc.nome)}</span><br>${linksGoogle(loc.lat.toFixed(6), loc.lon.toFixed(6))}`).openPopup();
+    mapa.setView([loc.lat, loc.lon], 18);
+    html += `<div class="alerta" style="border-left-color:var(--info);background:var(--info-soft)">Localização <b>aproximada</b> pelo ${esc(loc.precisao)} (OpenStreetMap). Confira no satélite onde fica o imóvel.</div>`;
+  } else {
+    html += `<div class="alerta">Endereço não encontrado no mapa. Navegue até o imóvel e contorne o terreno.</div>`;
+  }
+  html += `<p style="margin:12px 0 0"><b>Marcar o terreno e as medidas</b></p>
+    <ol class="passos"><li>Clique em <b>Contornar terreno</b>.</li><li>Clique no mapa em cada canto do terreno, em sequência.</li>
+    <li>As medidas de cada lado aparecem enquanto você desenha. Clique em <b>Concluir</b> no fim.</li></ol>
+    ${ref ? `<p class="muted">Área para comparar: <b>${fmt(ref)} m²</b> ${r.unidade_autonoma ? "(terreno do condomínio)" : "(área da matrícula)"}.</p>` : ""}
+    <button class="btn" id="des-ini">Contornar terreno</button><button class="btn sec" id="des-desf" disabled>Desfazer ponto</button><button class="btn sec" id="des-fim" disabled>Concluir</button><button class="btn sec" id="des-canc" disabled>Cancelar</button>
+    <p class="muted" id="des-info"></p>`;
+  $("#mat-local").innerHTML = html;
+  $("#des-ini").onclick = () => iniciarDesenho(r);
+  $("#des-desf").onclick = () => { estado.desenho?.pontos.pop(); redesenhar(); };
+  $("#des-canc").onclick = () => encerrarDesenho();
+  $("#des-fim").onclick = () => concluirDesenho(r);
+}
+const camadaDesenho = L.layerGroup().addTo(mapa);
+function iniciarDesenho(r) {
+  estado.desenho = { pontos: [], ref: areaReferencia(r) };
+  mapa.getContainer().classList.add("desenhando"); mapa.closePopup();
+  camadaMat.eachLayer(l => l.closePopup && l.closePopup());
+  ["#des-desf", "#des-fim", "#des-canc"].forEach(id => $(id).disabled = false); $("#des-ini").disabled = true;
+  redesenhar();
+}
+function adicionarPonto(ll) { estado.desenho.pontos.push(ll); redesenhar(); }
+function areaPlana(pts) {  // área em m² no elipsoide GRS80 (SIRGAS 2000), próxima da área UTM do cálculo final
+  if (pts.length < 3) return 0;
+  const a = 6378137, e2 = 0.00669438, rad = Math.PI / 180;
+  const lat0 = pts.reduce((s, p) => s + p.lat, 0) / pts.length * rad, w = 1 - e2 * Math.sin(lat0) ** 2;
+  const M = a * (1 - e2) / w ** 1.5, N = a / Math.sqrt(w), k = 0.9996;  // raios de curvatura e escala UTM
+  const xy = pts.map(p => [p.lng * rad * N * Math.cos(lat0) * k, p.lat * rad * M * k]);
+  let s = 0; xy.forEach((a, i) => { const b = xy[(i + 1) % xy.length]; s += a[0] * b[1] - b[0] * a[1]; });
+  return Math.abs(s) / 2;
+}
+function redesenhar() {
+  camadaDesenho.clearLayers();
+  const d = estado.desenho; if (!d) return;
+  const pts = d.pontos;
+  pts.forEach(p => L.circleMarker(p, { radius: 5, color: "#fff", weight: 2, fillColor: corMapa(), fillOpacity: 1 }).addTo(camadaDesenho));
+  if (pts.length >= 2) (pts.length >= 3 ? L.polygon(pts, { color: corMapa(), weight: 3, fillOpacity: .15, dashArray: "6 5" }) : L.polyline(pts, { color: corMapa(), weight: 3 })).addTo(camadaDesenho);
+  const area = areaPlana(pts);
+  desenharMedidas(pts, pts.length >= 3 ? area : null, camadaDesenho);
+  const dif = d.ref && area ? ` (${area >= d.ref ? "+" : ""}${fmt((area - d.ref) / d.ref * 100, 1)}% em relação a ${fmt(d.ref)} m²)` : "";
+  $("#des-info").innerHTML = pts.length ? `${pts.length} ponto(s)${pts.length >= 3 ? ` — área <b>${fmt(area)} m²</b>${dif}` : ""}` : "Clique no primeiro canto do terreno.";
+}
+function encerrarDesenho() {
+  estado.desenho = null; camadaDesenho.clearLayers(); mapa.getContainer().classList.remove("desenhando");
+  if ($("#des-ini")) { $("#des-ini").disabled = false; ["#des-desf", "#des-fim", "#des-canc"].forEach(id => $(id).disabled = true); $("#des-info").textContent = ""; }
+}
+async function concluirDesenho(r) {
+  const pts = estado.desenho?.pontos || [];
+  if (pts.length < 3) return $("#des-info").textContent = "Marque pelo menos 3 cantos.";
+  try {
+    const d = await postJSON("api/geo/poligono", { coords_lonlat: pts.map(p => [p.lng, p.lat]), area_referencia_m2: areaReferencia(r) });
+    encerrarDesenho();
+    Object.assign(r, { vertices: d.vertices, segmentos: d.segmentos, geojson: d.geojson, area_calculada_m2: d.area_m2, perimetro_m: d.perimetro_m, epsg: d.epsg,
+      datum: `SIRGAS 2000 / UTM ${d.epsg - 31960}S (contorno desenhado no mapa)` });
+    r.alertas = r.alertas.filter(a => !a.startsWith("Contorno desenhado"));
+    r.alertas.unshift(`Contorno desenhado no mapa: ${fmt(d.area_m2)} m²` + (d.diferenca_pct != null ? ` (${d.diferenca_pct >= 0 ? "+" : ""}${fmt(d.diferenca_pct, 1)}% em relação a ${fmt(areaReferencia(r))} m² da matrícula).` : ".") +
+      " É uma marcação aproximada sobre a imagem de satélite, não um levantamento topográfico.");
+    renderMatricula(r);
+  } catch (e) { $("#des-info").textContent = e.message; }
 }
 
 // ---------- diretrizes

@@ -102,3 +102,17 @@ def test_subpasta_incorporacao():
     assert c.get("/incorporacao/").status_code == 200
     assert "londrina" in c.get("/incorporacao/api/zoneamento").json()["cidades"]
     assert c.get("/").status_code == 200
+
+
+def test_api_poligono_desenhado():
+    c = TestClient(app)
+    # quadrado de ~30 m em Londrina, desenhado em lon/lat
+    from inteligencia_urbana.geo.coordenadas import geo_para_utm, utm_para_geo
+    e, n = geo_para_utm(-51.1525, -23.3270)
+    pts = [utm_para_geo(x, y) for x, y in [(e, n), (e + 30, n), (e + 30, n - 30), (e, n - 30)]]
+    r = c.post("/api/geo/poligono", json={"coords_lonlat": pts, "area_referencia_m2": 1000}).json()
+    assert r["area_m2"] == pytest.approx(900, abs=0.5) and r["perimetro_m"] == pytest.approx(120, abs=0.1)
+    assert r["diferenca_pct"] == pytest.approx(-10, abs=0.1)
+    assert [round(s["distancia_m"], 1) for s in r["segmentos"]] == [30.0, 30.0, 30.0, 30.0]
+    cruzado = [pts[0], pts[2], pts[1], pts[3]]
+    assert c.post("/api/geo/poligono", json={"coords_lonlat": cruzado}).status_code == 422
