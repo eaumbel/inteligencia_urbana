@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inteligência Urbana</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root { --bg:#f4f5f2; --card:#fff; --ink:#1f2a24; --muted:#5f6b64; --line:#dde2dc; --acc:#1f6f50; --warn:#b4541a; --ok:#2e7d32; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--ink); }
+  header { background:var(--acc); color:#fff; padding:12px 20px; display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; }
+  header span { opacity:.8; font-size:13px; }
+  nav { display:flex; gap:4px; padding:8px 16px 0; flex-wrap:wrap; border-bottom:1px solid var(--line); background:#fff; }
+  nav button { border:0; background:none; padding:10px 14px; cursor:pointer; font:inherit; color:var(--muted); border-bottom:3px solid transparent; }
+  nav button.ativo { color:var(--acc); border-color:var(--acc); font-weight:600; }
+  main { display:grid; grid-template-columns: minmax(340px, 520px) 1fr; gap:16px; padding:16px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } #mapa { height: 380px !important; } }
+  .painel { display:none; } .painel.ativo { display:block; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px; margin-bottom:12px; }
+  .card h2 { font-size:15px; margin:0 0 10px; }
+  label { display:block; font-size:12px; color:var(--muted); margin:8px 0 3px; }
+  input, select, textarea { width:100%; padding:7px 8px; border:1px solid var(--line); border-radius:6px; font:inherit; background:#fff; color:var(--ink); }
+  textarea { min-height:160px; font-family: ui-monospace, Menlo, monospace; font-size:12px; }
+  .grade { display:grid; grid-template-columns: 1fr 1fr; gap:0 10px; }
+  .btn { background:var(--acc); color:#fff; border:0; border-radius:6px; padding:8px 14px; cursor:pointer; font:inherit; margin:10px 6px 0 0; }
+  .btn.sec { background:#fff; color:var(--acc); border:1px solid var(--acc); }
+  #mapa { height: calc(100vh - 140px); min-height:420px; border-radius:8px; border:1px solid var(--line); }
+  .kpis { display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:8px; }
+  .kpi { background:#f7f9f6; border:1px solid var(--line); border-radius:6px; padding:8px; }
+  .kpi b { display:block; font-size:16px; } .kpi small { color:var(--muted); }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th, td { border-bottom:1px solid var(--line); padding:4px 6px; text-align:left; vertical-align:top; }
+  .alerta { overflow-wrap:anywhere; background:#fff4ec; border-left:4px solid var(--warn); padding:6px 10px; margin:4px 0; font-size:13px; }
+  .tag { display:inline-block; padding:1px 7px; border-radius:10px; font-size:11px; background:#e8efe9; margin:1px; }
+  .tag.onus { background:#fde2d4; color:#8a3510; }
+  .muted { color:var(--muted); font-size:12px; }
+  #mp-svg svg { width:100%; height:auto; border:1px solid var(--line); border-radius:6px; }
+  details summary { cursor:pointer; color:var(--acc); margin:6px 0; }
+</style>
+</head>
+<body>
+<header><h1>Inteligência Urbana</h1><span>Matrícula · Diretrizes · Zoneamento · Viabilidade · Masterplan · REURB</span></header>
+<nav id="abas">
+  <button data-aba="matricula" class="ativo">Matrícula</button>
+  <button data-aba="diretrizes">Diretrizes (IPPUL)</button>
+  <button data-aba="zoneamento">Zoneamento &amp; vocação</button>
+  <button data-aba="viabilidade">Viabilidade</button>
+  <button data-aba="masterplan">Masterplan</button>
+  <button data-aba="reurb">REURB</button>
+</nav>
+<main>
+<section>
+  <!-- MATRÍCULA -->
+  <div class="painel ativo" id="p-matricula">
+    <div class="card">
+      <h2>Análise de matrícula</h2>
+      <label>PDF ou TXT da certidão de inteiro teor</label><input type="file" id="mat-arq" accept=".pdf,.txt">
+      <label>…ou cole o texto</label><textarea id="mat-txt" placeholder="MATRÍCULA Nº ... vértice V1, de coordenadas N 7.418.000,000 m e E 480.000,000 m; ..."></textarea>
+      <label>Sistema de coordenadas</label>
+      <select id="mat-epsg"><option value="">Detectar automaticamente</option><option value="31982">SIRGAS 2000 / UTM 22S (EPSG:31982)</option><option value="31983">SIRGAS 2000 / UTM 23S (EPSG:31983)</option><option value="29192">SAD-69 / UTM 22S (EPSG:29192)</option></select>
+      <button class="btn" id="mat-ir">Analisar</button>
+    </div>
+    <div id="mat-res"></div>
+  </div>
+
+  <!-- DIRETRIZES -->
+  <div class="painel" id="p-diretrizes">
+    <div class="card">
+      <h2>Consulta prévia / diretrizes de parcelamento</h2>
+      <label>PDF ou TXT</label><input type="file" id="dir-arq" accept=".pdf,.txt">
+      <label>…ou cole o texto</label><textarea id="dir-txt"></textarea>
+      <button class="btn" id="dir-ir">Analisar diretrizes</button>
+    </div>
+    <div id="dir-res"></div>
+  </div>
+
+  <!-- ZONEAMENTO -->
+  <div class="painel" id="p-zoneamento">
+    <div class="card">
+      <h2>Zoneamento e vocação da área</h2>
+      <div class="grade">
+        <div><label>Município</label><select id="zon-cidade"></select></div>
+        <div><label>Zona</label><select id="zon-zona"></select></div>
+        <div><label>Área do terreno (m²)</label><input type="number" id="zon-area" value="120000"></div>
+        <div><label>APP / restrições (m²)</label><input type="number" id="zon-app" value="0"></div>
+      </div>
+      <button class="btn" id="zon-ir">Analisar vocação</button>
+      <p class="muted" id="zon-status"></p>
+    </div>
+    <div id="zon-res"></div>
+  </div>
+
+  <!-- VIABILIDADE -->
+  <div class="painel" id="p-viabilidade">
+    <div class="card">
+      <h2>Estudo de viabilidade</h2>
+      <label>Tipo de empreendimento</label>
+      <select id="via-tipo"><option value="loteamento">Loteamento</option><option value="incorporacao">Incorporação (CUB)</option></select>
+      <div id="via-form" class="grade"></div>
+      <button class="btn" id="via-ir">Calcular</button>
+    </div>
+    <div id="via-res"></div>
+  </div>
+
+  <!-- MASTERPLAN -->
+  <div class="painel" id="p-masterplan">
+    <div class="card">
+      <h2>Masterplan preliminar</h2>
+      <p class="muted" id="mp-origem">Analise uma matrícula com coordenadas para usar o perímetro (ou desenhe um exemplo).</p>
+      <div id="mp-form" class="grade"></div>
+      <button class="btn" id="mp-ir">Gerar masterplan</button>
+      <button class="btn sec" id="mp-exemplo">Usar perímetro de exemplo</button>
+    </div>
+    <div id="mp-res"></div>
+  </div>
+
+  <!-- REURB -->
+  <div class="painel" id="p-reurb">
+    <div class="card">
+      <h2>Classificação preliminar de REURB (Lei 13.465/2017)</h2>
+      <label><input type="checkbox" id="re-renda" style="width:auto"> Ocupação predominantemente de baixa renda</label>
+      <label><input type="checkbox" id="re-2016" style="width:auto" checked> Núcleo consolidado até 22/12/2016</label>
+      <label><input type="checkbox" id="re-pub" style="width:auto"> Área pública</label>
+      <label><input type="checkbox" id="re-app" style="width:auto"> Ocupação em APP</label>
+      <label><input type="checkbox" id="re-risco" style="width:auto"> Área de risco</label>
+      <button class="btn" id="re-ir">Classificar</button>
+    </div>
+    <div id="re-res"></div>
+  </div>
+</section>
+<section><div id="mapa"></div></section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const fmt = (v, d = 2) => v == null ? "—" : Number(v).toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d });
+const brl = v => v == null ? "—" : Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const estado = { matricula: null, masterplan: null, schemas: null };
+
+// ---------- abas
+document.querySelectorAll("#abas button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#abas button").forEach(x => x.classList.toggle("ativo", x === b));
+  document.querySelectorAll(".painel").forEach(p => p.classList.toggle("ativo", p.id === "p-" + b.dataset.aba));
+  setTimeout(() => mapa.invalidateSize(), 50);
+});
+
+// ---------- mapa
+const mapa = L.map("mapa").setView([-23.31, -51.16], 12);
+const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 20, attribution: "Esri World Imagery" });
+const osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" });
+sat.addTo(mapa);
+L.control.layers({ "Satélite": sat, "Mapa": osm }).addTo(mapa);
+let camadaMat = L.layerGroup().addTo(mapa), camadaMp = L.layerGroup().addTo(mapa);
+const CORES = { lote: "#f6d58e", via: "#bdbdbd", area_verde: "#7cc576", institucional: "#f2a65a", app: "#2e7d32", remanescente: "#e0e0e0" };
+
+async function api(url, opts = {}) {
+  const r = await fetch(url, opts);
+  if (!r.ok) { let m = r.statusText; try { const j = await r.json(); m = typeof j.detail === "string" ? j.detail : (j.detail || []).map(d => `${d.loc.slice(-1)[0]}: ${d.type === "missing" ? "campo obrigatório" : d.msg}`).join("; "); } catch {} throw new Error(m); }
+  return r;
+}
+function erro(alvo, e) { $(alvo).innerHTML = `<div class="card"><div class="alerta">${esc(e.message || e)}</div></div>`; }
+function baixar(blob, nome) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = nome; a.click(); }
+const alertasHTML = l => (l || []).map(a => `<div class="alerta">${esc(a)}</div>`).join("");
+
+// ---------- matrícula
+$("#mat-ir").onclick = async () => {
+  const fd = new FormData();
+  if ($("#mat-arq").files[0]) fd.append("arquivo", $("#mat-arq").files[0]); else fd.append("texto", $("#mat-txt").value);
+  if ($("#mat-epsg").value) fd.append("epsg", $("#mat-epsg").value);
+  try {
+    const r = await (await api("/api/matricula/analisar", { method: "POST", body: fd })).json();
+    estado.matricula = r; renderMatricula(r);
+  } catch (e) { erro("#mat-res", e); }
+};
+
+function renderMatricula(r) {
+  const id = [["Matrícula", r.numero], ["Cartório", r.cartorio], ["Comarca", r.comarca], ["Tipo", r.tipo_imovel], ["Lote/Quadra", [r.lote, r.quadra].filter(Boolean).join(" / ")],
+    ["Loteamento", r.loteamento], ["Inscrição", r.inscricao_imobiliaria], ["CCIR", r.ccir], ["CAR", r.car], ["Datum", r.datum || "não declarado"]]
+    .filter(x => x[1]).map(([k, v]) => `<tr><th>${k}</th><td>${esc(v)}</td></tr>`).join("");
+  const atos = r.atos.map(a => `<tr><td>${a.tipo}-${a.numero}</td><td>${a.categorias.map(c => `<span class="tag ${a.onus ? "onus" : ""}">${esc(c)}</span>`).join("")}${a.situacao ? `<div class="muted">${esc(a.situacao)}</div>` : ""}</td></tr>`).join("");
+  const verts = r.vertices.map(v => `<tr><td>${esc(v.nome)}</td><td>${fmt(v.e, 3)}</td><td>${fmt(v.n, 3)}</td></tr>`).join("");
+  const segs = r.segmentos.map(s => `<tr><td>${esc(s.de)}→${esc(s.para)}</td><td>${fmt(s.azimute_graus, 4)}°</td><td>${fmt(s.distancia_m)}</td><td>${esc(s.confrontante || "—")}</td></tr>`).join("");
+  $("#mat-res").innerHTML = `
+    <div class="card"><h2>Resumo</h2>
+      <div class="kpis">
+        <div class="kpi"><small>Área declarada</small><b>${fmt(r.area_declarada_m2)} m²</b></div>
+        <div class="kpi"><small>Área calculada</small><b>${fmt(r.area_calculada_m2)} m²</b></div>
+        <div class="kpi"><small>Perímetro</small><b>${fmt(r.perimetro_m)} m</b></div>
+        <div class="kpi"><small>Ônus ativos</small><b>${r.atos.filter(a => a.onus && a.situacao.startsWith("ativo")).length}</b></div>
+      </div>
+      ${alertasHTML(r.alertas)}
+      <table style="margin-top:8px">${id}</table>
+      ${r.geojson ? `<button class="btn" id="mat-kml">Baixar KML (Google Earth)</button><button class="btn sec" id="mat-kmz">KMZ</button><button class="btn sec" id="mat-mp">Usar no masterplan</button>` : ""}
+    </div>
+    <div class="card"><h2>Atos registrais (${r.atos.length})</h2><table>${atos || "<tr><td>Nenhum ato identificado</td></tr>"}</table></div>
+    <div class="card"><h2>Memorial descritivo</h2>
+      <details ${verts ? "open" : ""}><summary>Vértices (${r.vertices.length})</summary><table><tr><th>Vértice</th><th>E</th><th>N</th></tr>${verts}</table></details>
+      <details open><summary>Confrontações (${r.segmentos.length})</summary><table><tr><th>Lance</th><th>Azimute</th><th>Dist. (m)</th><th>Confrontante</th></tr>${segs}</table></details>
+      ${r.medidas.length ? `<details open><summary>Medidas lineares</summary><table>${r.medidas.map(m => `<tr><td>${esc(m.lado)}</td><td>${fmt(m.medida_m)} m</td><td>${esc(m.confrontacao)}</td></tr>`).join("")}</table></details>` : ""}
+    </div>`;
+  camadaMat.clearLayers();
+  if (r.geojson) {
+    const g = L.geoJSON(r.geojson, { style: { color: "#ff7a00", weight: 3, fillOpacity: .15 } }).addTo(camadaMat);
+    r.geojson.geometry.coordinates[0].slice(0, -1).forEach((c, i) => L.circleMarker([c[1], c[0]], { radius: 4, color: "#fff", fillColor: "#ff7a00", fillOpacity: 1 })
+      .bindTooltip(r.vertices[i]?.nome || "").addTo(camadaMat));
+    mapa.fitBounds(g.getBounds(), { padding: [30, 30] });
+    const kml = async kmz => {
+      const corpo = { nome: `Matrícula ${r.numero || ""}`.trim(), epsg: r.epsg, vertices: r.vertices, segmentos: r.segmentos, kmz,
+        info: { "Matrícula": r.numero || "—", "Área declarada (m²)": fmt(r.area_declarada_m2), "Área calculada (m²)": fmt(r.area_calculada_m2), "Perímetro (m)": fmt(r.perimetro_m) } };
+      const resp = await api("/api/geo/kml", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
+      baixar(await resp.blob(), `matricula_${r.numero || "imovel"}.${kmz ? "kmz" : "kml"}`);
+    };
+    $("#mat-kml").onclick = () => kml(false); $("#mat-kmz").onclick = () => kml(true);
+    $("#mat-mp").onclick = () => { document.querySelector('[data-aba="masterplan"]').click(); atualizarOrigemMp(); };
+    $("#zon-area").value = Math.round(r.area_calculada_m2 || r.area_declarada_m2 || 0);
+  }
+}
+
+// ---------- diretrizes
+$("#dir-ir").onclick = async () => {
+  const fd = new FormData();
+  if ($("#dir-arq").files[0]) fd.append("arquivo", $("#dir-arq").files[0]); else fd.append("texto", $("#dir-txt").value);
+  try {
+    const d = await (await api("/api/diretrizes/analisar", { method: "POST", body: fd })).json();
+    const temas = Object.entries(d.trechos_por_tema).map(([t, l]) => `<details><summary>${esc(t.replace(/_/g, " "))} (${l.length})</summary><ul>${l.map(x => `<li>${esc(x)}</li>`).join("")}</ul></details>`).join("");
+    $("#dir-res").innerHTML = `<div class="card"><h2>Diretrizes identificadas</h2>${alertasHTML(d.alertas)}
+      <table><tr><th>Consulta</th><td>${esc(d.numero_consulta || "—")}</td></tr><tr><th>Zonas</th><td>${d.zonas.map(z => `<span class="tag">${esc(z)}</span>`).join("") || "—"}</td></tr>
+      <tr><th>Macrozona</th><td>${esc(d.macrozona || "—")}</td></tr><tr><th>Lote mínimo</th><td>${fmt(d.lote_minimo_m2)} m²</td></tr><tr><th>Testada mínima</th><td>${fmt(d.testada_minima_m)} m</td></tr>
+      <tr><th>Áreas públicas</th><td>${Object.entries(d.percentuais_areas).map(([k, v]) => `${esc(k)}: ${fmt(v, 1)}%`).join("<br>") || "—"}</td></tr>
+      <tr><th>Caixas de via</th><td>${d.larguras_vias_m.map(v => fmt(v, 1) + " m").join(", ") || "—"}</td></tr>
+      <tr><th>Faixas</th><td>${d.faixas_m.map(f => `${esc(f.descricao)}: ${fmt(f.largura_m, 1)} m`).join("<br>") || "—"}</td></tr></table></div>
+      <div class="card"><h2>Trechos por tema</h2>${temas || "<p class='muted'>Nenhum.</p>"}</div>`;
+  } catch (e) { erro("#dir-res", e); }
+};
+
+// ---------- zoneamento
+async function carregarCidades() {
+  const { cidades } = await (await api("/api/zoneamento")).json();
+  $("#zon-cidade").innerHTML = cidades.map(c => `<option>${c}</option>`).join("");
+  await carregarZonas();
+}
+async function carregarZonas() {
+  const d = await (await api("/api/zoneamento/" + $("#zon-cidade").value)).json();
+  $("#zon-zona").innerHTML = Object.entries(d.zonas).map(([k, z]) => `<option value="${k}">${k} — ${esc(z.nome)}</option>`).join("");
+  $("#zon-status").textContent = d.status_dados || "";
+}
+$("#zon-cidade").onchange = carregarZonas;
+$("#zon-ir").onclick = async () => {
+  try {
+    const body = { cidade: $("#zon-cidade").value, zona: $("#zon-zona").value, area_terreno_m2: +$("#zon-area").value, area_app_m2: +$("#zon-app").value };
+    const d = await (await api("/api/vocacao", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
+    const z = d.zona, v = d.vocacao;
+    $("#zon-res").innerHTML = `<div class="card"><h2>${esc(z.codigo)} — ${esc(z.nome)}</h2>${alertasHTML(v.observacoes)}
+      <div class="kpis"><div class="kpi"><small>Potencial construtivo</small><b>${fmt(v.potencial_construtivo_m2, 0)} m²</b></div><div class="kpi"><small>Projeção máxima</small><b>${fmt(v.projecao_maxima_m2, 0)} m²</b></div></div>
+      <table style="margin-top:8px">${[["CA básico", z.ca_basico], ["CA máximo", z.ca_maximo], ["Taxa de ocupação", z.taxa_ocupacao], ["Permeabilidade", z.taxa_permeabilidade], ["Gabarito (pav.)", z.gabarito_pavimentos || "livre"], ["Lote mínimo (m²)", z.lote_minimo_m2], ["Testada (m)", z.testada_minima_m], ["Recuo frontal (m)", z.recuo_frontal_m]]
+        .map(([k, x]) => `<tr><th>${k}</th><td>${x ?? "—"}</td></tr>`).join("")}</table></div>
+      <div class="card"><h2>Vocação sugerida</h2><table><tr><th>Produto</th><th>Aderência</th><th>Motivo</th></tr>${v.produtos.map(p => `<tr><td>${esc(p.produto)}</td><td>${p.aderencia}</td><td>${esc(p.motivo)}</td></tr>`).join("")}</table></div>`;
+  } catch (e) { erro("#zon-res", e); }
+};
+
+// ---------- formulários gerados a partir do schema da API
+async function schemas() {
+  if (!estado.schemas) estado.schemas = (await (await api("/openapi.json")).json()).components.schemas;
+  return estado.schemas;
+}
+function montarForm(alvo, schema, ignorar = []) {
+  $(alvo).innerHTML = Object.entries(schema.properties).filter(([k]) => !ignorar.includes(k)).map(([k, p]) => {
+    const tipo = p.type || (p.anyOf && p.anyOf.find(x => x.type !== "null")?.type);
+    const req = (schema.required || []).includes(k);
+    const rotulo = k.replace(/^pct_/, "% ").replace(/_m2\b/, " (m²)").replace(/_m\b/, " (m)").replace(/_pct\b/, " (%)").replace(/_/g, " ").replace(/^./, c => c.toUpperCase());
+    return `<div><label title="${esc(p.description || "")}">${esc(rotulo)}${req ? " *" : ""}</label><input data-campo="${k}" type="number" step="any" value="${p.default ?? ""}" ${req ? "required" : ""} placeholder="${esc(p.description || "")}"></div>`;
+  }).join("");
+}
+function lerForm(alvo) {
+  const o = {};
+  document.querySelectorAll(`${alvo} [data-campo]`).forEach(i => { if (i.value !== "") o[i.dataset.campo] = Number(i.value); });
+  return o;
+}
+async function montarViabilidade() {
+  const s = await schemas();
+  montarForm("#via-form", s[$("#via-tipo").value === "loteamento" ? "PremissasLoteamento" : "PremissasIncorporacao"]);
+  if (estado.matricula?.area_calculada_m2) {
+    const campo = document.querySelector('[data-campo="area_gleba_m2"], [data-campo="area_terreno_m2"]');
+    if (campo) campo.value = Math.round(estado.matricula.area_calculada_m2);
+  }
+}
+$("#via-tipo").onchange = montarViabilidade;
+$("#via-ir").onclick = async () => {
+  const tipo = $("#via-tipo").value;
+  try {
+    const r = await (await api("/api/viabilidade/" + tipo, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(lerForm("#via-form")) })).json();
+    const i = r.indicadores;
+    const linhas = obj => Object.entries(obj).map(([k, v]) => `<tr><th>${esc(k.replace(/_/g, " "))}</th><td>${typeof v === "number" ? (/m2|pct/.test(k) ? fmt(v) : brl(v)) : v ?? "—"}</td></tr>`).join("");
+    $("#via-res").innerHTML = `<div class="card"><h2>Resultado</h2>${alertasHTML(r.alertas)}
+      <div class="kpis">
+        <div class="kpi"><small>${tipo === "loteamento" ? "Lotes" : "Unidades"}</small><b>${r.numero_lotes ?? r.unidades}</b></div>
+        <div class="kpi"><small>VGV total</small><b>${brl(r.vgv)}</b></div>
+        <div class="kpi"><small>Lucro</small><b>${brl(i.lucro)}</b></div>
+        <div class="kpi"><small>Margem s/ VGV</small><b>${fmt(i.margem_sobre_vgv_pct, 1)}%</b></div>
+        <div class="kpi"><small>ROI</small><b>${fmt(i.roi_pct, 1)}%</b></div>
+        <div class="kpi"><small>TIR a.a.</small><b>${i.tir_anual_pct == null ? "—" : fmt(i.tir_anual_pct, 1) + "%"}</b></div>
+        <div class="kpi"><small>VPL</small><b>${brl(i.vpl)}</b></div>
+        <div class="kpi"><small>Exposição máx.</small><b>${brl(i.exposicao_maxima)}</b></div>
+        <div class="kpi"><small>Payback</small><b>${i.payback_meses ?? "—"} meses</b></div>
+      </div>
+      <h2 style="margin-top:14px">Fluxo de caixa acumulado</h2>${grafico(i.fluxo_acumulado)}</div>
+      <div class="card"><h2>Quadro de áreas</h2><table>${linhas(r.quadro_areas)}</table></div>
+      <div class="card"><h2>Custos</h2><table>${linhas(r.custos)}</table></div>`;
+  } catch (e) { erro("#via-res", e); }
+};
+function grafico(serie) {
+  const W = 460, H = 160, min = Math.min(0, ...serie), max = Math.max(0, ...serie), n = serie.length - 1 || 1;
+  const x = i => i / n * W, y = v => H - (v - min) / ((max - min) || 1) * H;
+  const pts = serie.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  return `<svg viewBox="-60 -10 ${W + 70} ${H + 30}" style="width:100%"><line x1="0" x2="${W}" y1="${y(0)}" y2="${y(0)}" stroke="#999" stroke-dasharray="4"/>
+    <polyline points="${pts}" fill="none" stroke="#1f6f50" stroke-width="2"/>
+    <text x="-5" y="${y(max) + 4}" font-size="10" text-anchor="end">${(max / 1e6).toFixed(1)} mi</text><text x="-5" y="${y(min) + 4}" font-size="10" text-anchor="end">${(min / 1e6).toFixed(1)} mi</text>
+    <text x="${W}" y="${H + 18}" font-size="10" text-anchor="end">mês ${n}</text></svg>`;
+}
+
+// ---------- masterplan
+let perimetroMp = null, epsgMp = 31982;
+function atualizarOrigemMp() {
+  const r = estado.matricula;
+  if (r?.vertices?.length >= 3 && r.vertices[0].e > 1000) {
+    perimetroMp = r.vertices.map(v => [v.e, v.n]); epsgMp = r.epsg;
+    $("#mp-origem").textContent = `Perímetro da matrícula ${r.numero || ""}: ${r.vertices.length} vértices, ${fmt(r.area_calculada_m2)} m².`;
+  }
+}
+$("#mp-exemplo").onclick = () => {
+  perimetroMp = [[480000, 7418000], [480420, 7418060], [480450, 7417690], [480020, 7417650]]; epsgMp = 31982;
+  $("#mp-origem").textContent = "Perímetro de exemplo (≈ 15,5 ha em Londrina).";
+};
+async function montarMasterplan() {
+  const s = await schemas();
+  montarForm("#mp-form", s.ParametrosMasterplan, ["perimetro_utm", "epsg", "exclusoes_utm", "cursos_dagua_utm"]);
+}
+$("#mp-ir").onclick = async () => {
+  atualizarOrigemMp();
+  if (!perimetroMp) return erro("#mp-res", "Sem perímetro: analise uma matrícula com coordenadas ou use o exemplo.");
+  try {
+    const body = { ...lerForm("#mp-form"), perimetro_utm: perimetroMp, epsg: epsgMp };
+    const m = await (await api("/api/masterplan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
+    estado.masterplan = m;
+    $("#mp-res").innerHTML = `<div class="card"><h2>Resultado</h2>${alertasHTML(m.alertas)}<div id="mp-svg">${m.svg}</div>
+      <button class="btn" id="mp-kml">Baixar KML (Google Earth)</button><button class="btn sec" id="mp-svgdl">Baixar imagem (SVG)</button><button class="btn sec" id="mp-via">Levar para viabilidade</button></div>`;
+    camadaMp.clearLayers();
+    const g = L.geoJSON({ type: "FeatureCollection", features: m.features }, {
+      style: f => ({ color: "#444", weight: f.properties.tipo === "lote" ? .5 : 1, fillColor: CORES[f.properties.tipo] || "#ccc", fillOpacity: .75 }),
+      onEachFeature: (f, l) => l.bindTooltip(`${esc(f.properties.nome)} — ${fmt(f.properties.area_m2)} m²`),
+    }).addTo(camadaMp);
+    mapa.fitBounds(g.getBounds());
+    $("#mp-kml").onclick = async () => baixar(await (await api("/api/geo/kml-features", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome: "Masterplan", features: m.features }) })).blob(), "masterplan.kml");
+    $("#mp-svgdl").onclick = () => baixar(new Blob([m.svg], { type: "image/svg+xml" }), "masterplan.svg");
+    $("#mp-via").onclick = async () => {
+      document.querySelector('[data-aba="viabilidade"]').click(); $("#via-tipo").value = "loteamento"; await montarViabilidade();
+      const r = m.resumo, set = (k, v) => { const i = document.querySelector(`[data-campo="${k}"]`); if (i) i.value = v; };
+      set("area_gleba_m2", Math.round(r.area_gleba_m2)); set("area_app_m2", Math.round(r.area_app_m2));
+      set("pct_sistema_viario", (r.area_vias_m2 / r.area_util_m2 * 100).toFixed(1)); set("pct_area_verde", (r.area_verde_m2 / r.area_util_m2 * 100).toFixed(1));
+      set("pct_institucional", (r.area_institucional_m2 / r.area_util_m2 * 100).toFixed(1)); set("area_media_lote_m2", r.lote_medio_m2.toFixed(0));
+    };
+  } catch (e) { erro("#mp-res", e); }
+};
+
+// ---------- REURB
+$("#re-ir").onclick = async () => {
+  const body = { baixa_renda_predominante: $("#re-renda").checked, nucleo_consolidado_ate_2016: $("#re-2016").checked, area_publica: $("#re-pub").checked, em_app: $("#re-app").checked, em_area_de_risco: $("#re-risco").checked };
+  try {
+    const r = await (await api("/api/reurb/classificar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
+    const lista = (t, l) => `<h2>${t}</h2><ul>${l.map(x => `<li>${esc(x)}</li>`).join("")}</ul>`;
+    $("#re-res").innerHTML = `<div class="card"><h2 style="font-size:17px">${esc(r.modalidade)}</h2>${alertasHTML(r.alertas)}${lista("Fundamentos", r.fundamentos)}${lista("Instrumentos", r.instrumentos)}${lista("Documentos técnicos", r.documentos)}</div>`;
+  } catch (e) { erro("#re-res", e); }
+};
+
+carregarCidades(); montarViabilidade(); montarMasterplan();
+</script>
+</body>
+</html>

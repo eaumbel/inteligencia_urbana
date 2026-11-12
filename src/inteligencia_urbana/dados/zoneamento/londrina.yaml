@@ -1,0 +1,99 @@
+cidade: Londrina
+uf: PR
+codigo_ibge: 4113700
+orgao_planejamento: IPPUL — Instituto de Pesquisa e Planejamento Urbano de Londrina
+mapa_oficial: SIGLON / Geoportal da Prefeitura de Londrina
+status_dados: >-
+  ILUSTRATIVO. Estrutura pronta para receber os parâmetros oficiais. Os códigos e índices abaixo
+  são exemplos e DEVEM ser substituídos/conferidos com a Lei de Uso e Ocupação do Solo vigente,
+  suas alterações e o mapa oficial de zoneamento.
+legislacao:
+  - {tema: Plano Diretor, numero: "a confirmar", validado: false}
+  - {tema: Uso e Ocupação do Solo, numero: "12.236/2015 (confirmar alterações)", validado: false}
+  - {tema: Parcelamento do Solo, numero: "a confirmar", validado: false}
+  - {tema: Sistema Viário, numero: "a confirmar", validado: false}
+parcelamento:
+  areas_publicas_minimas_pct: {institucional: null, verde: null, sistema_viario: null}
+  lote_minimo_m2: null
+  testada_minima_m: null
+  comprimento_maximo_quadra_m: null
+  validado: false
+zonas:
+  ZR1:
+    nome: Zona Residencial de baixa densidade (exemplo)
+    categoria: residencial_baixa_densidade
+    ca_basico: 1.0
+    ca_maximo: null
+    taxa_ocupacao: 0.5
+    taxa_permeabilidade: 0.25
+    gabarito_pavimentos: 2
+    lote_minimo_m2: 360
+    testada_minima_m: 12
+    recuo_frontal_m: 5
+    usos_permitidos: [residencial unifamiliar]
+    validado: false
+  ZR3:
+    nome: Zona Residencial de média densidade (exemplo)
+    categoria: residencial_media_densidade
+    ca_basico: 1.4
+    ca_maximo: null
+    taxa_ocupacao: 0.6
+    taxa_permeabilidade: 0.2
+    gabarito_pavimentos: 4
+    lote_minimo_m2: 250
+    testada_minima_m: 10
+    recuo_frontal_m: 5
+    usos_permitidos: [residencial unifamiliar, residencial multifamiliar, comércio vicinal]
+    validado: false
+  ZR5:
+    nome: Zona Residencial de alta densidade (exemplo)
+    categoria: residencial_alta_densidade
+    ca_basico: 3.0
+    ca_maximo: 4.0
+    taxa_ocupacao: 0.6
+    taxa_permeabilidade: 0.15
+    gabarito_pavimentos: 0
+    lote_minimo_m2: 450
+    testada_minima_m: 15
+    recuo_frontal_m: 5
+    usos_permitidos: [residencial multifamiliar, comércio e serviços]
+    validado: false
+  ZC:
+    nome: Zona Comercial / Corredor (exemplo)
+    categoria: comercial_misto
+    ca_basico: 2.0
+    ca_maximo: 3.5
+    taxa_ocupacao: 0.7
+    taxa_permeabilidade: 0.1
+    gabarito_pavimentos: 0
+    lote_minimo_m2: 300
+    testada_minima_m: 12
+    recuo_frontal_m: 0
+    usos_permitidos: [comércio, serviços, residencial multifamiliar]
+    validado: false
+  ZI:
+    nome: Zona Industrial (exemplo)
+    categoria: industrial
+    ca_basico: 1.0
+    ca_maximo: null
+    taxa_ocupacao: 0.6
+    taxa_permeabilidade: 0.2
+    gabarito_pavimentos: 0
+    lote_minimo_m2: 1000
+    testada_minima_m: 20
+    recuo_frontal_m: 10
+    usos_permitidos: [indústria, logística, galpões]
+    validado: false
+  ZEIS:
+    nome: Zona Especial de Interesse Social (exemplo)
+    categoria: zeis_interesse_social
+    ca_basico: 1.0
+    ca_maximo: 2.0
+    taxa_ocupacao: 0.7
+    taxa_permeabilidade: 0.1
+    gabarito_pavimentos: 4
+    lote_minimo_m2: 125
+    testada_minima_m: 5
+    recuo_frontal_m: 3
+    usos_permitidos: [habitação de interesse social, comércio vicinal]
+    validado: false
