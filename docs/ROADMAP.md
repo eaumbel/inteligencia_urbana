@@ -11,6 +11,7 @@
 - [x] API + interface web com mapa
 - [x] Camadas oficiais (IBGE: hidrografia, municípios; CAR via proxy), Street View, camadas do usuário (KML/GeoJSON/WMS)
 - [x] Córregos do IBGE → APP automática no masterplan
+- [x] CAR: camada, consulta por clique e sobreposição com a matrícula (proxy com TLS legado só para o SICAR)
 
 ## Fase 2 — Dados oficiais (depende de material do usuário)
 - [ ] Preencher e validar os parâmetros de zoneamento de cada cidade a partir das leis vigentes
@@ -19,7 +20,6 @@
 - [ ] Calibrar o leitor de matrícula com certidões reais dos Registros de Imóveis da região
 - [ ] Tabela histórica do CUB-PR (atualização mensal)
 
-- [ ] Habilitar o CAR (decisão sobre a compatibilidade TLS do SICAR)
 - [ ] INCRA SIGEF/SNCI (parcelas certificadas): o servidor não respondeu a partir do ambiente de desenvolvimento;
       testar a partir de uma rede brasileira ou importar o shapefile por município
 - [ ] Geoportal de Londrina (SIGLON): verificar se publica lotes/zoneamento em WMS/WFS

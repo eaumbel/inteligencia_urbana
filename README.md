@@ -37,12 +37,14 @@ Municípios iniciais: **Londrina, Cambé, Rolândia e Ibiporã** (PR). Outros en
 
 ![Hidrografia](docs/img/4_drenagem.png)
 
-### SICAR (pendente)
+### SICAR e segurança TLS
 
 O servidor do SICAR só aceita troca de chaves RSA no TLS 1.2, sem *forward secrecy*. O Chrome atual e o OpenSSL 3
-recusam essa configuração. Por isso o CAR passa por um proxy da API (`/api/proxy/car-*`, restrito aos endereços
-oficiais). Para funcionar, o proxy precisa aceitar essa cifra **apenas para geoserver.car.gov.br**. Essa decisão
-de segurança está pendente: até ela ser tomada, as consultas ao CAR retornam erro 502 com a explicação.
+recusam essa configuração. Por isso o CAR passa por um proxy da API (`/api/proxy/car-wms` e `/api/proxy/car-wfs`),
+restrito aos endereços oficiais e que nunca aceita uma URL vinda do cliente. Esse proxy aceita as suítes RSA
+**somente** para `geoserver.car.gov.br` (`HOSTS_TLS_LEGADO` em `geo/camadas_oficiais.py`). A mudança foi autorizada
+pelo responsável do projeto em 12/11/2026. A verificação de certificado e de hostname continua ativa, e um teste
+garante que nenhum outro host recebe essa exceção.
 
 ## Como rodar
 

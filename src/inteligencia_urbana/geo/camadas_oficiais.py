@@ -51,18 +51,30 @@ CAMADAS_WMS = [
 TIMEOUT = 60
 
 
-def contexto_ssl():
-    """Contexto TLS das chamadas a serviços públicos (verificação de certificado ativa)."""
+# Hosts autorizados a negociar TLS com troca de chaves RSA (sem forward secrecy).
+# Autorizado pelo responsável do projeto em 12/11/2026, somente para o SICAR, cujo
+# servidor não oferece outra opção. Dados públicos; certificado e hostname continuam
+# verificados. Não adicione outros hosts sem nova avaliação.
+HOSTS_TLS_LEGADO = {"geoserver.car.gov.br"}
+
+
+def contexto_ssl(host: str | None = None):
+    """Contexto TLS das chamadas a serviços públicos (verificação de certificado sempre ativa)."""
     import ssl
 
-    return ssl.create_default_context()
+    ctx = ssl.create_default_context()
+    if host in HOSTS_TLS_LEGADO:
+        # Lista padrão do OpenSSL, que ainda inclui as suítes RSA (ex.: AES256-GCM-SHA384)
+        ctx.set_ciphers("DEFAULT")
+    return ctx
 
 
 def baixar(url: str, params: dict) -> tuple[bytes, str]:
     """GET simples; retorna (corpo, content-type)."""
     full = url + "?" + urllib.parse.urlencode(params)
     req = urllib.request.Request(full, headers={"User-Agent": "inteligencia-urbana/0.1"})
-    with urllib.request.urlopen(req, timeout=TIMEOUT, context=contexto_ssl()) as r:
+    host = urllib.parse.urlsplit(url).hostname
+    with urllib.request.urlopen(req, timeout=TIMEOUT, context=contexto_ssl(host)) as r:
         return r.read(), r.headers.get_content_type()
 
 
