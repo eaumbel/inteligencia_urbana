@@ -27,6 +27,9 @@
 - [ ] Geoportal de Londrina (SIGLON): verificar se publica lotes/zoneamento em WMS/WFS
 
 ## Fase 3 — Produto
+- [x] Imagem de apresentação do masterplan sobre o satélite (PNG)
+- [ ] Traçado orgânico: vias curvas acompanhando o relevo (exige topografia/MDE), rotatórias e praças lineares
+- [ ] Estilização por IA da prancha (opcional, serviço externo de imagem)
 - [ ] Persistência de projetos e estudos (Supabase/Postgres + PostGIS) e login
 - [ ] Relatório de viabilidade em PDF/DOCX com mapa, masterplan e quadros
 - [ ] Topografia: importar curvas de nível/MDE, mapa de declividade (bloqueio de ≥ 30%) e hidrografia

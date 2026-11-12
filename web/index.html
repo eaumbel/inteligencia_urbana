@@ -1235,7 +1235,9 @@ async function gerarMasterplan() {
   const m = await (await api("api/masterplan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
   estado.masterplan = m;
   $("#mp-res").innerHTML = `<div class="card"><h2>Resultado</h2>${alertasHTML(m.alertas)}${quadroMasterplan(m.resumo)}<div id="mp-svg" style="margin-top:12px">${m.svg}</div>
-    <button class="btn" id="mp-kml">Baixar KML (Google Earth)</button><button class="btn sec" id="mp-svgdl">Baixar imagem (SVG)</button><button class="btn sec" id="mp-via">Levar para viabilidade</button></div>`;
+    <button class="btn" id="mp-kml">Baixar KML (Google Earth)</button><button class="btn sec" id="mp-svgdl">Baixar imagem (SVG)</button><button class="btn sec" id="mp-via">Levar para viabilidade</button>
+    <button class="btn" id="mp-img">Gerar imagem de apresentação</button></div><div id="mp-img-res"></div>`;
+  $("#mp-img").onclick = () => mostrarImagemApresentacao(m, "#mp-img-res");
   desenharMasterplan(m, true);
   $("#mp-kml").onclick = () => baixarKmlMasterplan(m);
   $("#mp-svgdl").onclick = () => baixar(new Blob([m.svg], { type: "image/svg+xml" }), "masterplan.svg");
@@ -1291,6 +1293,190 @@ function desenharMasterplan(m, ajustar = false) {
   const atualizar = () => { const z = mapa.getZoom(); mostrar(rotQuadras, z < 18); mostrar(rotAreas, z >= 17); mostrar(rotLotes, z >= 18); };
   mapa.off("zoomend", desenharMasterplan._z); desenharMasterplan._z = atualizar; mapa.on("zoomend", atualizar); atualizar();
   if (ajustar) mapa.fitBounds(g.getBounds(), { padding: [30, 30], maxZoom: 18 });
+}
+
+// ---------- IMAGEM DE APRESENTAÇÃO (render 2D sobre o satélite)
+// Desenha o masterplan em canvas, no estilo de prancha de apresentação: satélite de fundo, asfalto com calçada,
+// lotes com divisas, áreas verdes arborizadas, APP sobre a mata, sombras, legenda, norte, escala e quadro de áreas.
+const R_TERRA = 6378137;
+const mercX = (lon, z) => (lon + 180) / 360 * 256 * 2 ** z;
+const mercY = (lat, z) => { const s = Math.sin(lat * Math.PI / 180); return (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * 256 * 2 ** z; };
+function carregarImagem(url) {
+  return new Promise(ok => { const im = new Image(); im.crossOrigin = "anonymous"; im.onload = () => ok(im); im.onerror = () => ok(null); im.src = url; });
+}
+function aleatorio(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
+function dentroPoligono([x, y], anel) {
+  let d = false;
+  for (let i = 0, j = anel.length - 1; i < anel.length; j = i++) {
+    const [xi, yi] = anel[i], [xj, yj] = anel[j];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) d = !d;
+  }
+  return d;
+}
+async function gerarImagemApresentacao(m, { largura = 2400, titulo = "Masterplan preliminar", subtitulo = "" } = {}) {
+  const feats = m.features;
+  let lo0 = 180, lo1 = -180, la0 = 90, la1 = -90;
+  const anéis = f => f.geometry.type === "Polygon" ? [f.geometry.coordinates] : f.geometry.type === "MultiPolygon" ? f.geometry.coordinates : [];
+  feats.forEach(f => anéis(f).forEach(pg => pg[0].forEach(([lo, la]) => { lo0 = Math.min(lo0, lo); lo1 = Math.max(lo1, lo); la0 = Math.min(la0, la); la1 = Math.max(la1, la); })));
+  // margem de contexto ao redor (30% da maior dimensão)
+  const mlo = (lo1 - lo0) * .3 + 0.0006, mla = (la1 - la0) * .3 + 0.0006;
+  lo0 -= mlo; lo1 += mlo; la0 -= mla; la1 += mla;
+  const areaMapa = largura - 520;  // faixa da direita: legenda e quadro
+  let z = 19; while (z > 12 && (mercX(lo1, z) - mercX(lo0, z)) > areaMapa * 1.4) z--;
+  const x0 = mercX(lo0, z), wPx = mercX(lo1, z) - x0;
+  const esc = areaMapa / wPx, altura = Math.max(Math.round((mercY(la0, z) - mercY(la1, z)) * esc), 1350);
+  // altura mínima da prancha: amplia o recorte verticalmente, centrado no projeto
+  const hPx = altura / esc, y0 = (mercY(la1, z) + mercY(la0, z)) / 2 - hPx / 2;
+  const canvas = document.createElement("canvas"); canvas.width = largura; canvas.height = altura;
+  const ctx = canvas.getContext("2d");
+  const P = ([lo, la]) => [(mercX(lo, z) - x0) * esc, (mercY(la, z) - y0) * esc];
+  const latC = (la0 + la1) / 2, mPorPx = 2 * Math.PI * R_TERRA * Math.cos(latC * Math.PI / 180) / (256 * 2 ** z) / esc;
+  const m2px = mtr => mtr / mPorPx;
+
+  // 1) satélite (Esri World Imagery); sem acesso, fundo neutro
+  ctx.fillStyle = "#dfe3da"; ctx.fillRect(0, 0, areaMapa, altura);
+  const URL_SAT = (zz, ty, tx) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zz}/${ty}/${tx}`;
+  async function bloco(tx, ty) {  // tenta de novo e, se faltar, usa o bloco do nível de zoom acima
+    let im = await carregarImagem(URL_SAT(z, ty, tx)) || await carregarImagem(URL_SAT(z, ty, tx) + "?t=1");
+    if (im) return { im, sx: 0, sy: 0, sw: 256 };
+    const pai = await carregarImagem(URL_SAT(z - 1, ty >> 1, tx >> 1));
+    return pai ? { im: pai, sx: (tx & 1) * 128, sy: (ty & 1) * 128, sw: 128 } : null;
+  }
+  const tiles = [];
+  for (let tx = Math.floor(x0 / 256); tx <= Math.floor((x0 + wPx) / 256); tx++)
+    for (let ty = Math.floor(y0 / 256); ty <= Math.floor((y0 + hPx) / 256); ty++)
+      tiles.push(bloco(tx, ty).then(b => ({ b, tx, ty })));
+  let falhas = 0;
+  const lista = await Promise.all(tiles);
+  for (const { b, tx, ty } of lista) {
+    if (!b) { falhas++; continue; }
+    ctx.drawImage(b.im, b.sx, b.sy, b.sw, b.sw, (tx * 256 - x0) * esc, (ty * 256 - y0) * esc, 256 * esc + 1, 256 * esc + 1);
+  }
+  const satelite = falhas < lista.length / 2;
+  // leve dessaturação do entorno para o projeto se destacar
+  ctx.fillStyle = "rgba(255,255,255,.12)"; ctx.fillRect(0, 0, areaMapa, altura);
+
+  const caminho = f => { const p = new Path2D(); anéis(f).forEach(pg => pg.forEach(anel => anel.forEach((c, i) => { const [x, y] = P(c); i ? p.lineTo(x, y) : p.moveTo(x, y); }) || p.closePath())); return p; };
+  const doTipo = t => feats.filter(f => f.properties.tipo === t);
+  const sombra = (blur, dy) => { ctx.shadowColor = "rgba(0,0,0,.35)"; ctx.shadowBlur = blur; ctx.shadowOffsetX = dy * .6; ctx.shadowOffsetY = dy; };
+  const semSombra = () => { ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetX = ctx.shadowOffsetY = 0; };
+
+  // 2) APP / fundo de vale: mata do satélite visível, com véu verde e limite tracejado
+  doTipo("app").forEach(f => { const p = caminho(f); ctx.fillStyle = "rgba(46,125,50,.28)"; ctx.fill(p, "evenodd");
+    ctx.setLineDash([m2px(4), m2px(3)]); ctx.strokeStyle = "rgba(200,255,200,.95)"; ctx.lineWidth = Math.max(2, m2px(.8)); ctx.stroke(p); ctx.setLineDash([]); });
+  // 3) vias: calçada clara por baixo, asfalto por cima, meio-fio
+  const vias = doTipo("via");
+  sombra(m2px(2), m2px(.6));
+  vias.forEach(f => { ctx.fillStyle = "#d8d3c8"; ctx.fill(caminho(f), "evenodd"); });
+  semSombra();
+  vias.forEach(f => { const p = caminho(f); ctx.save(); ctx.clip(p, "evenodd");
+    ctx.strokeStyle = "#4b4f55"; ctx.lineWidth = m2px(f.properties.diretriz ? 14 : 9); ctx.lineJoin = "round"; ctx.stroke(p);  // asfalto interno
+    ctx.restore(); });
+  vias.forEach(f => { const p = caminho(f); ctx.save(); ctx.clip(p, "evenodd"); ctx.fillStyle = "#555a60"; ctx.globalAlpha = .9;
+    ctx.fill(p, "evenodd"); ctx.globalAlpha = 1; ctx.strokeStyle = "#d8d3c8"; ctx.lineWidth = m2px(6); ctx.stroke(p); ctx.restore(); });  // calçadas nas bordas
+  // 4) lotes: gramado claro com divisas brancas e sombra
+  const lotes = doTipo("lote");
+  sombra(m2px(1.5), m2px(.5));
+  lotes.forEach((f, i) => { ctx.fillStyle = ["#cfe0a7", "#c8db9e", "#d5e5ae"][i % 3]; ctx.fill(caminho(f)); });
+  semSombra();
+  lotes.forEach(f => { ctx.strokeStyle = "rgba(255,255,255,.95)"; ctx.lineWidth = Math.max(1.2, m2px(.35)); ctx.stroke(caminho(f)); });
+  // 5) institucional e remanescente
+  doTipo("institucional").forEach(f => { const p = caminho(f); sombra(m2px(1.5), m2px(.5)); ctx.fillStyle = "#ead7b0"; ctx.fill(p, "evenodd"); semSombra();
+    ctx.save(); ctx.clip(p, "evenodd"); ctx.strokeStyle = "rgba(160,110,40,.25)"; ctx.lineWidth = m2px(.4);
+    for (let k = -altura; k < largura; k += m2px(3)) { ctx.beginPath(); ctx.moveTo(k, 0); ctx.lineTo(k + altura, altura); ctx.stroke(); } ctx.restore();
+    ctx.strokeStyle = "#fff"; ctx.lineWidth = Math.max(1.5, m2px(.4)); ctx.stroke(p); });
+  doTipo("remanescente").forEach(f => { ctx.fillStyle = "rgba(235,235,225,.75)"; ctx.fill(caminho(f), "evenodd"); });
+  // 6) áreas verdes: gramado e árvores (copa com sombra e brilho)
+  const rnd = aleatorio(20261112);
+  doTipo("area_verde").forEach(f => {
+    const p = caminho(f); ctx.fillStyle = "#86b85a"; ctx.fill(p, "evenodd");
+    ctx.save(); ctx.clip(p, "evenodd");
+    const anel = anéis(f)[0][0].map(P), xs = anel.map(q => q[0]), ys = anel.map(q => q[1]);
+    const area = f.properties.area_m2 || 0, n = Math.min(900, Math.round(area / 45));
+    for (let k = 0, t = 0; k < n && t < n * 6; t++) {
+      const q = [Math.min(...xs) + rnd() * (Math.max(...xs) - Math.min(...xs)), Math.min(...ys) + rnd() * (Math.max(...ys) - Math.min(...ys))];
+      if (!dentroPoligono(q, anel)) continue; k++;
+      const r = m2px(2.2 + rnd() * 2.3);
+      ctx.fillStyle = "rgba(0,0,0,.28)"; ctx.beginPath(); ctx.arc(q[0] + r * .35, q[1] + r * .45, r, 0, 7); ctx.fill();
+      const g = ctx.createRadialGradient(q[0] - r * .35, q[1] - r * .35, r * .1, q[0], q[1], r);
+      g.addColorStop(0, ["#9ccc65", "#8bc34a", "#7cb342"][k % 3]); g.addColorStop(1, ["#33691e", "#2e5e1b", "#3b6e22"][k % 3]);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q[0], q[1], r, 0, 7); ctx.fill();
+    }
+    ctx.restore();
+    ctx.strokeStyle = "rgba(255,255,255,.9)"; ctx.lineWidth = Math.max(1.5, m2px(.4)); ctx.stroke(p);
+  });
+  // 7) perímetro do imóvel
+  const r = estado.matricula;
+  if (r?.geojson) {
+    const p = new Path2D(); r.geojson.geometry.coordinates[0].forEach((c, i) => { const [x, y] = P(c); i ? p.lineTo(x, y) : p.moveTo(x, y); }); p.closePath();
+    ctx.strokeStyle = "rgba(0,0,0,.45)"; ctx.lineWidth = Math.max(5, m2px(1.4)); ctx.stroke(p);
+    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = Math.max(2.5, m2px(.7)); ctx.setLineDash([m2px(5), m2px(2.5)]); ctx.stroke(p); ctx.setLineDash([]);
+  }
+  // 8) rótulos das quadras e das vias previstas
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  const quadras = {};
+  lotes.forEach(f => (quadras[f.properties.quadra] ||= []).push(f));
+  const etiqueta = (x, y, txt, fundo = "rgba(20,22,25,.78)") => {
+    ctx.font = `700 ${Math.max(18, Math.min(30, m2px(3.2)))}px Manrope, Arial, sans-serif`;
+    const w = ctx.measureText(txt).width + 18, h = Math.max(28, Math.min(42, m2px(4.6)));
+    ctx.fillStyle = fundo; ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h, 8); ctx.fill();
+    ctx.fillStyle = "#fff"; ctx.fillText(txt, x, y + 1);
+  };
+  Object.entries(quadras).forEach(([q, fs]) => {
+    const pts = fs.flatMap(f => anéis(f)[0][0]).map(P);
+    etiqueta(pts.reduce((a, c) => a + c[0], 0) / pts.length, pts.reduce((a, c) => a + c[1], 0) / pts.length, q, "rgba(181,18,27,.88)");
+  });
+  vias.filter(f => f.properties.diretriz && f.properties.area_m2 > 300).forEach(f => {
+    const pts = anéis(f)[0][0].map(P); etiqueta(pts.reduce((a, c) => a + c[0], 0) / pts.length, pts.reduce((a, c) => a + c[1], 0) / pts.length, f.properties.nome);
+  });
+
+  // 9) painel lateral: título, legenda, quadro de áreas, norte e escala
+  const X = areaMapa;
+  ctx.fillStyle = "#141619"; ctx.fillRect(X, 0, largura - X, altura);
+  ctx.fillStyle = "#b5121b"; ctx.fillRect(X, 0, 10, altura);
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  let y = 90;
+  ctx.fillStyle = "#fff"; ctx.font = "700 40px Sora, Arial, sans-serif"; ctx.fillText(titulo, X + 50, y);
+  y += 44; ctx.fillStyle = "#aeb6bf"; ctx.font = "500 24px Manrope, Arial, sans-serif";
+  (subtitulo || "").split("\n").forEach(l => { ctx.fillText(l, X + 50, y); y += 32; });
+  y += 30;
+  const leg = [["#cfe0a7", "Lotes"], ["#555a60", "Sistema viário"], ["#86b85a", "Área verde / praça"], ["#ead7b0", "Área institucional"],
+    ["rgba(46,125,50,.6)", "APP / fundo de vale"], ["#ffffff", "Perímetro do imóvel"]];
+  ctx.font = "600 24px Manrope, Arial, sans-serif";
+  leg.forEach(([cor, nome]) => { ctx.fillStyle = cor; ctx.beginPath(); ctx.roundRect(X + 50, y - 22, 34, 26, 5); ctx.fill(); ctx.fillStyle = "#e8eaed"; ctx.fillText(nome, X + 100, y); y += 44; });
+  y += 20; ctx.strokeStyle = "#2a2e33"; ctx.beginPath(); ctx.moveTo(X + 50, y); ctx.lineTo(largura - 50, y); ctx.stroke(); y += 50;
+  const rs = m.resumo, linhas = [["Área do imóvel", `${fmt(rs.area_gleba_m2, 0)} m²`], ["Lotes", `${rs.numero_lotes}`], ["Lote médio", `${fmt(rs.lote_medio_m2, 0)} m²`],
+    ["Lotes (% da área)", `${fmt(rs.pct_lotes, 1)}%`], ["Sistema viário", `${fmt(rs.pct_vias, 1)}%`], ["Área verde", `${fmt(rs.pct_verde, 1)}%`],
+    ["Institucional", `${fmt(rs.pct_institucional, 1)}%`], ["APP / fundo de vale", `${fmt(rs.area_app_m2, 0)} m²`]];
+  linhas.forEach(([k, v]) => { ctx.fillStyle = "#aeb6bf"; ctx.font = "500 24px Manrope, Arial, sans-serif"; ctx.fillText(k, X + 50, y);
+    ctx.fillStyle = "#fff"; ctx.font = "700 26px Manrope, Arial, sans-serif"; ctx.textAlign = "right"; ctx.fillText(v, largura - 50, y); ctx.textAlign = "left"; y += 44; });
+  // norte
+  const ny = Math.max(y + 90, altura - 230), nx = X + 110;
+  ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.moveTo(nx, ny - 50); ctx.lineTo(nx + 22, ny + 20); ctx.lineTo(nx, ny + 6); ctx.lineTo(nx - 22, ny + 20); ctx.closePath(); ctx.fill();
+  ctx.font = "700 28px Sora, Arial"; ctx.textAlign = "center"; ctx.fillText("N", nx, ny + 58); ctx.textAlign = "left";
+  // escala gráfica
+  const passo = [10, 20, 25, 50, 100, 200, 250, 500].find(v => m2px(v) > 120) || 500, wE = m2px(passo);
+  const ex = X + 200, ey = ny + 30;
+  ctx.fillStyle = "#fff"; ctx.fillRect(ex, ey, wE / 2, 12); ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.strokeRect(ex, ey, wE, 12);
+  ctx.font = "500 22px Manrope, Arial"; ctx.fillText("0", ex - 6, ey + 42); ctx.fillText(`${passo} m`, ex + wE - 20, ey + 42);
+  ctx.fillStyle = "#868d95"; ctx.font = "500 19px Manrope, Arial";
+  ["Estudo preliminar de massa — não substitui projeto", "urbanístico aprovado. Imagem: " + (satelite ? "Esri World Imagery." : "satélite indisponível."),
+    `Inteligência Urbana · ${new Date().toLocaleDateString("pt-BR")}`].forEach((l, i) => ctx.fillText(l, X + 50, Math.max(ey + 90, altura - 110) + i * 28));
+  return { canvas, satelite };
+}
+async function mostrarImagemApresentacao(m, alvo) {
+  carregando(alvo, "Gerando a imagem de apresentação (baixando o satélite)…");
+  const r = estado.matricula, d = r?.diretrizes;
+  const sub = [r?.numero && `Matrícula ${r.numero}`, r?.lote && `Lote ${r.lote}${r.quadra ? " · Quadra " + r.quadra : ""}`,
+    r?.loteamento, d && `Diretrizes IPPUL — CPS ${d.numero_consulta}`].filter(Boolean).join("\n");
+  const { canvas, satelite } = await gerarImagemApresentacao(m, { subtitulo: sub });
+  let url = null;
+  try { url = canvas.toDataURL("image/png"); } catch {}
+  if (!url) return erro(alvo, "O navegador bloqueou a composição com o satélite. Tente novamente ou use outro navegador.");
+  $(alvo).innerHTML = `<div class="card"><h2>Imagem de apresentação</h2>
+    ${satelite ? "" : `<div class="alerta">Não foi possível baixar o satélite: a imagem saiu com fundo neutro (tente gerar de novo).</div>`}
+    <img src="${url}" alt="Masterplan sobre satélite" style="width:100%;border-radius:10px;border:1px solid var(--line)">
+    <a class="btn" href="${url}" download="masterplan_apresentacao.png">Baixar PNG (${canvas.width} × ${canvas.height})</a></div>`;
 }
 
 // ---------- NOVO ESTUDO (passo a passo)
@@ -1377,7 +1563,9 @@ async function wzGerarMasterplan() {
       <div class="mp-svg" style="margin-top:12px">${m.svg}</div>
       <p class="muted">No mapa: quadras e áreas identificadas; aproxime o zoom para ver o número e a área de cada lote.</p>
       <button class="btn" id="wz-mp-kml">Baixar KML (Google Earth)</button><button class="btn sec" id="wz-mp-via">Levar para viabilidade</button>
-      <button class="btn sec" id="wz-mp-refazer">Gerar de novo</button><button class="btn sec" id="wz-mp-param">Ajustar parâmetros</button>`;
+      <button class="btn sec" id="wz-mp-refazer">Gerar de novo</button><button class="btn sec" id="wz-mp-param">Ajustar parâmetros</button>
+      <button class="btn" id="wz-mp-img">Gerar imagem de apresentação</button><div id="wz-mp-img-res" style="margin-top:12px"></div>`;
+    $("#wz-mp-img").onclick = () => mostrarImagemApresentacao(m, "#wz-mp-img-res");
     $("#wz-mp-kml").onclick = () => baixarKmlMasterplan(m);
     $("#wz-mp-via").onclick = () => levarParaViabilidade(m);
     $("#wz-mp-refazer").onclick = wzGerarMasterplan;

@@ -18,6 +18,14 @@ Municípios iniciais: **Londrina, Cambé, Rolândia e Ibiporã** (PR). Outros en
 3. **Masterplan**: gerado automaticamente com as diretrizes e demarcado no mapa (quadras, lotes numerados com
    área, vias previstas, áreas verde e institucional, APP), com KML e atalho para a viabilidade.
 
+### Imagem de apresentação
+
+O masterplan pode ser exportado como prancha em PNG (2400 px), desenhada sobre o satélite: vias em asfalto com
+calçadas, lotes com divisas, praças arborizadas, áreas institucionais, APP sobre a mata, quadras identificadas,
+legenda, quadro de áreas, norte e escala.
+
+![Imagem de apresentação](docs/img/render_apresentacao.png)
+
 ## Módulos
 
 | Módulo | O que faz |
