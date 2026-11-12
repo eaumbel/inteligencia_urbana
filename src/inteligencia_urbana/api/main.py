@@ -32,6 +32,26 @@ app = FastAPI(
     version="0.1.0",
 )
 
+PREFIXO = "/incorporacao"
+
+
+@app.middleware("http")
+async def remover_prefixo(request, call_next):
+    """Permite servir o app em eaumbel.com.br/incorporacao/ sem mudar as rotas.
+
+    /incorporacao (sem barra) redireciona para /incorporacao/, para que os caminhos
+    relativos da interface (api/...) fiquem dentro da subpasta.
+    """
+    from fastapi.responses import RedirectResponse
+
+    caminho = request.scope["path"]
+    if caminho == PREFIXO:
+        return RedirectResponse(PREFIXO + "/", status_code=308)
+    if caminho.startswith(PREFIXO + "/"):
+        request.scope["path"] = caminho[len(PREFIXO):]
+        request.scope["root_path"] = request.scope.get("root_path", "") + PREFIXO
+    return await call_next(request)
+
 
 async def _texto(arquivo: UploadFile | None, texto: str | None) -> str:
     if arquivo is not None and arquivo.filename:

@@ -93,3 +93,12 @@ def test_cruzar_car_e_drenagem_offline():
     assert d["cursos"][0]["corta_o_imovel"] and d["cursos"][0]["extensao_no_imovel_m"] == pytest.approx(200, abs=2)
     m = gerar_masterplan(ParametrosMasterplan(perimetro_utm=RET, cursos_dagua_utm=[[(480000, 7417850), (480400, 7417850)]]))
     assert m.resumo["area_app_m2"] == pytest.approx(400 * 60, rel=1e-3)
+
+
+def test_subpasta_incorporacao():
+    c = TestClient(app)
+    r = c.get("/incorporacao", follow_redirects=False)
+    assert r.status_code == 308 and r.headers["location"] == "/incorporacao/"
+    assert c.get("/incorporacao/").status_code == 200
+    assert "londrina" in c.get("/incorporacao/api/zoneamento").json()["cidades"]
+    assert c.get("/").status_code == 200
