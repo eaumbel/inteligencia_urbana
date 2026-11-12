@@ -62,6 +62,23 @@ Abra http://localhost:8000. A documentação da API fica em http://localhost:800
 pytest
 ```
 
+## Deploy na Vercel
+
+O repositório já está pronto para a Vercel:
+
+- `api/index.py`: ponto de entrada (função Python que expõe o `app` FastAPI)
+- `vercel.json`: todas as rotas vão para a função; região **gru1 (São Paulo)**, tempo máximo de 60 s
+  (o SICAR pode demorar) e inclusão das pastas `src/` e `web/` no pacote
+- `requirements.txt`: dependências de produção (≈ 194 MB instaladas, abaixo do limite de 250 MB)
+- `.vercelignore`: deixa testes e documentação fora do deploy
+
+Para conectar:
+
+1. Em vercel.com, clique em **Add New → Project** e importe `eaumbel/inteligencia_urbana`.
+2. Em **Framework Preset**, escolha **Other**. Não é preciso comando de build nem variáveis de ambiente.
+3. Clique em **Deploy**. A cada push no branch de produção a Vercel publica de novo; nos demais branches ela gera
+   uma URL de prévia.
+
 ## Avisos importantes
 
 - **Zoneamento:** os YAML de cada cidade trazem a estrutura completa, mas os **índices são ilustrativos**
