@@ -516,21 +516,63 @@ function carregarPdfJs() {
   });
   return pdfjsPromessa;
 }
+// OCR no navegador (Tesseract.js) para certidões escaneadas
+const TESS = {
+  script: "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js",
+  workerPath: "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js",
+  corePath: "https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1",
+  langPath: "https://cdn.jsdelivr.net/npm/@tesseract.js-data/por@1.0.0/4.0.0_best_int",
+};
+let tessPromessa = null;
+function carregarScript(src) {
+  return new Promise((ok, falha) => {
+    const sc = document.createElement("script");
+    sc.src = src; sc.onload = ok; sc.onerror = () => falha(new Error("Não foi possível carregar o leitor de OCR. Verifique a internet."));
+    document.head.appendChild(sc);
+  });
+}
+async function workerOCR(aviso) {
+  if (!tessPromessa) tessPromessa = (async () => {
+    await carregarScript(TESS.script);
+    aviso("Preparando o reconhecimento de texto (OCR)… na primeira vez pode levar alguns segundos.");
+    const w = await Tesseract.createWorker("por", 1, { workerPath: TESS.workerPath, corePath: TESS.corePath, langPath: TESS.langPath,
+      logger: m => { if (m.status === "recognizing text" && workerOCR.pagina) aviso(`Reconhecendo texto (OCR) — página ${workerOCR.pagina}: ${Math.round(m.progress * 100)}%`); } });
+    await w.setParameters({ tessedit_pageseg_mode: "4" });
+    return w;
+  })().catch(e => { tessPromessa = null; throw e; });
+  return tessPromessa;
+}
+// linhas do carimbo de autenticidade das certidões digitais não contam como conteúdo
+const CARIMBO = /consultar\s+a\s+autenticidade|aripar\.org|e-validador|c[óo]digo\s+de\s+verifica|consulta\s+dispon[íi]vel|^\s*p[áa]gina|valide\s+aqui|^\s*este\s+documento\s*$|sptth|rb\.gro/i;
+const conteudoUtil = t => t.split("\n").filter(l => l.trim().length > 10 && !CARIMBO.test(l)).join("").replace(/\s/g, "").length;
+
 async function textoDoArquivo(arq, aviso) {
-  if (!/\.pdf$/i.test(arq.name) && arq.type !== "application/pdf") return await arq.text();
+  if (!/\.pdf$/i.test(arq.name) && arq.type !== "application/pdf") return { texto: await arq.text(), ocr: 0 };
   const lib = await carregarPdfJs();
   const pdf = await lib.getDocument({ data: await arq.arrayBuffer() }).promise;
-  const paginas = [];
+  const paginas = []; let ocr = 0;
   for (let i = 1; i <= pdf.numPages; i++) {
     aviso(`Lendo o PDF: página ${i} de ${pdf.numPages}…`);
-    const c = await (await pdf.getPage(i)).getTextContent();
-    paginas.push(c.items.map(it => it.str + (it.hasEOL ? "\n" : " ")).join(""));
+    const pagina = await pdf.getPage(i);
+    const c = await pagina.getTextContent();
+    let texto = c.items.map(it => it.str + (it.hasEOL ? "\n" : " ")).join("");
+    if (conteudoUtil(texto) < 200) {  // página escaneada: renderiza em ~300 dpi e faz OCR
+      const w = await workerOCR(aviso);
+      workerOCR.pagina = `${i} de ${pdf.numPages}`;
+      aviso(`Reconhecendo texto (OCR) — página ${workerOCR.pagina}…`);
+      const vp = pagina.getViewport({ scale: 4 });
+      const canvas = document.createElement("canvas");
+      canvas.width = vp.width; canvas.height = vp.height;
+      await pagina.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
+      texto = (await w.recognize(canvas)).data.text;
+      canvas.width = canvas.height = 0; ocr++;
+    }
+    paginas.push(texto);
   }
   const texto = paginas.join("\n");
-  if (texto.replace(/\s/g, "").length < 50)
-    throw new Error(`Este PDF (${pdf.numPages} página${pdf.numPages > 1 ? "s" : ""}) é uma imagem escaneada, sem texto selecionável. ` +
-      "Por enquanto, copie o texto da certidão e cole no campo \"…ou cole o texto\", ou use a versão digital da certidão (e-certidão do ONR/Registro de Imóveis).");
-  return texto;
+  if (conteudoUtil(texto) < 50)
+    throw new Error("Não foi possível ler texto neste PDF, nem por OCR. Copie o texto da certidão e cole no campo \"…ou cole o texto\".");
+  return { texto, ocr };
 }
 const carregando = (alvo, txt) => { $(alvo).innerHTML = `<div class="card"><p class="muted">${esc(txt)}</p></div>`; };
 function erro(alvo, e) { $(alvo).innerHTML = `<div class="card"><div class="alerta">${esc(e.message || e)}</div></div>`; }
@@ -542,7 +584,8 @@ $("#mat-ir").onclick = async () => {
   const fd = new FormData();
   try {
     const arq = $("#mat-arq").files[0];
-    const texto = arq ? await textoDoArquivo(arq, t => carregando("#mat-res", t)) : $("#mat-txt").value;
+    const lido = arq ? await textoDoArquivo(arq, t => carregando("#mat-res", t)) : { texto: $("#mat-txt").value, ocr: 0 };
+    const texto = lido.texto;
     if (!texto.trim()) throw new Error("Escolha um arquivo ou cole o texto da matrícula.");
     if (arq) $("#mat-txt").value = texto;
     fd.append("texto", texto);
@@ -554,32 +597,54 @@ $("#mat-ir").onclick = async () => {
 };
 
 function renderMatricula(r) {
-  const id = [["Matrícula", r.numero], ["Cartório", r.cartorio], ["Comarca", r.comarca], ["Tipo", r.tipo_imovel], ["Lote/Quadra", [r.lote, r.quadra].filter(Boolean).join(" / ")],
-    ["Loteamento", r.loteamento], ["Inscrição", r.inscricao_imobiliaria], ["CCIR", r.ccir], ["CAR", r.car], ["Datum", r.datum || "não declarado"]]
+  const id = [["Matrícula", r.numero], ["Cartório", r.cartorio], ["Comarca", r.comarca], ["Tipo", r.tipo_imovel],
+    ["Endereço", [r.endereco, r.cep && "CEP " + r.cep].filter(Boolean).join(" — ")],
+    ["Lote (data) / Quadra", [r.lote, r.quadra].filter(Boolean).join(" / ")], ["Loteamento", r.loteamento],
+    ["Inscrição imobiliária", r.inscricao_imobiliaria], ["CCIR", r.ccir], ["CAR", r.car],
+    ["Datum", r.vertices.length ? (r.datum || "não declarado") : null], ["Último ato (certidão)", r.ultimo_ato_certificado]]
     .filter(x => x[1]).map(([k, v]) => `<tr><th>${k}</th><td>${esc(v)}</td></tr>`).join("");
-  const atos = r.atos.map(a => `<tr><td>${a.tipo}-${a.numero}</td><td>${a.categorias.map(c => `<span class="tag ${a.onus ? "onus" : ""}">${esc(c)}</span>`).join("")}${a.situacao ? `<div class="muted">${esc(a.situacao)}</div>` : ""}</td></tr>`).join("");
+  const atos = r.atos.map(a => `<tr><td style="white-space:nowrap">${a.tipo}-${a.numero}</td><td>${a.categorias.map(c => `<span class="tag ${a.onus ? "onus" : ""}">${esc(c)}</span>`).join("")}${a.situacao ? `<div class="muted">${esc(a.situacao)}</div>` : ""}</td></tr>`).join("");
   const verts = r.vertices.map(v => `<tr><td>${esc(v.nome)}</td><td>${fmt(v.e, 3)}</td><td>${fmt(v.n, 3)}</td></tr>`).join("");
   const segs = r.segmentos.map(s => `<tr><td>${esc(s.de)}→${esc(s.para)}</td><td>${fmt(s.azimute_graus, 4)}°</td><td>${fmt(s.distancia_m)}</td><td>${esc(s.confrontante || "—")}</td></tr>`).join("");
+  const u = r.unidade_autonoma;
+  const unidade = u ? `<div class="card"><h2>Unidade autônoma${u.edificio ? " — " + esc(u.edificio) : ""}</h2>
+      <div class="kpis">
+        <div class="kpi"><small>Unidade</small><b>${esc(u.unidade || "—")}</b></div>
+        <div class="kpi"><small>Área total</small><b>${fmt(u.area_total_m2)} m²</b></div>
+        <div class="kpi"><small>Área privativa</small><b>${fmt(u.area_privativa_m2)} m²</b></div>
+        <div class="kpi"><small>Fração ideal do terreno</small><b>${fmt(u.fracao_ideal_terreno_m2)} m²</b></div>
+        <div class="kpi"><small>Participação</small><b>${fmt(u.participacao_condominio_pct)}%</b></div>
+        <div class="kpi"><small>Terreno do condomínio</small><b>${fmt(u.area_terreno_condominio_m2)} m²</b></div>
+      </div>${u.vagas ? `<p class="muted">Vaga(s) de garagem nº ${u.vagas.map(esc).join(", ")}</p>` : ""}</div>` : "";
+  const transm = r.transmissoes.length ? `<div class="card"><h2>Cadeia de transmissões</h2><table>
+      <tr><th>Ato</th><th>Natureza</th><th>Adquirente(s)</th><th>Fração</th><th>Valor</th></tr>
+      ${r.transmissoes.map(t => `<tr><td>${t.ato}</td><td>${esc(t.natureza)}</td><td>${t.adquirentes.map(esc).join("<br>") || "—"}</td><td>${t.fracao_pct ? fmt(t.fracao_pct, 0) + "%" : "100%"}</td><td>${brl(t.valor)}</td></tr>`).join("")}
+    </table><p class="muted">Confirme a titularidade atual na certidão; frações e cônjuges podem alterar a composição.</p></div>` : "";
+  const temMemorial = r.vertices.length || r.segmentos.length || r.medidas.length;
   $("#mat-res").innerHTML = `
     <div class="card"><h2>Resumo</h2>
       <div class="kpis">
         <div class="kpi"><small>Área declarada</small><b>${fmt(r.area_declarada_m2)} m²</b></div>
-        <div class="kpi"><small>Área calculada</small><b>${fmt(r.area_calculada_m2)} m²</b></div>
-        <div class="kpi"><small>Perímetro</small><b>${fmt(r.perimetro_m)} m</b></div>
+        ${r.area_calculada_m2 != null ? `<div class="kpi"><small>Área calculada</small><b>${fmt(r.area_calculada_m2)} m²</b></div>
+        <div class="kpi"><small>Perímetro</small><b>${fmt(r.perimetro_m)} m</b></div>` : ""}
+        <div class="kpi"><small>Atos</small><b>${r.atos.length}</b></div>
         <div class="kpi"><small>Ônus ativos</small><b>${r.atos.filter(a => a.onus && a.situacao.startsWith("ativo")).length}</b></div>
       </div>
       ${alertasHTML(r.alertas)}
       <table style="margin-top:8px">${id}</table>
       ${r.geojson ? `<button class="btn" id="mat-kml">Baixar KML (Google Earth)</button><button class="btn sec" id="mat-kmz">KMZ</button><button class="btn sec" id="mat-mp">Usar no masterplan</button>
-        <div style="margin-top:4px"><button class="btn sec" id="mat-sv">Street View</button><button class="btn sec" id="mat-car">CAR sobrepostos</button><button class="btn sec" id="mat-dren">Córregos próximos (IBGE)</button></div>` : ""}
+        <div style="margin-top:4px"><button class="btn sec" id="mat-sv">Street View</button><button class="btn sec" id="mat-car">CAR sobrepostos</button><button class="btn sec" id="mat-dren">Córregos próximos (IBGE)</button></div>`
+        : `<p class="muted" style="margin-top:12px">A matrícula não traz coordenadas: o imóvel não pode ser desenhado no mapa automaticamente.</p>`}
     </div>
     <div id="mat-cruz"></div>
+    ${unidade}
+    ${transm}
     <div class="card"><h2>Atos registrais (${r.atos.length})</h2><table>${atos || "<tr><td>Nenhum ato identificado</td></tr>"}</table></div>
-    <div class="card"><h2>Memorial descritivo</h2>
-      <details ${verts ? "open" : ""}><summary>Vértices (${r.vertices.length})</summary><table><tr><th>Vértice</th><th>E</th><th>N</th></tr>${verts}</table></details>
-      <details open><summary>Confrontações (${r.segmentos.length})</summary><table><tr><th>Lance</th><th>Azimute</th><th>Dist. (m)</th><th>Confrontante</th></tr>${segs}</table></details>
-      ${r.medidas.length ? `<details open><summary>Medidas lineares</summary><table>${r.medidas.map(m => `<tr><td>${esc(m.lado)}</td><td>${fmt(m.medida_m)} m</td><td>${esc(m.confrontacao)}</td></tr>`).join("")}</table></details>` : ""}
-    </div>`;
+    ${temMemorial ? `<div class="card"><h2>Divisas e confrontações</h2>
+      ${r.vertices.length ? `<details open><summary>Vértices (${r.vertices.length})</summary><table><tr><th>Vértice</th><th>E</th><th>N</th></tr>${verts}</table></details>` : ""}
+      ${r.segmentos.length ? `<details open><summary>Lances (${r.segmentos.length})</summary><table><tr><th>Lance</th><th>Azimute</th><th>Dist. (m)</th><th>Confrontante</th></tr>${segs}</table></details>` : ""}
+      ${r.medidas.length ? `<table>${r.medidas.map(m => `<tr><th>${esc(m.lado)}</th><td>${m.medida_m != null ? fmt(m.medida_m) + " m" : ""}</td><td>${esc(m.confrontacao)}</td></tr>`).join("")}</table>` : ""}
+    </div>` : ""}`;
   camadaMat.clearLayers(); camadaCruz.clearLayers(); estado.cursos = null;
   if (r.geojson) {
     const g = L.geoJSON(r.geojson, { style: { color: corMapa(), weight: 3, fillOpacity: .15 } }).addTo(camadaMat);
@@ -606,7 +671,7 @@ $("#dir-ir").onclick = async () => {
   const fd = new FormData();
   try {
     const arq = $("#dir-arq").files[0];
-    const texto = arq ? await textoDoArquivo(arq, t => carregando("#dir-res", t)) : $("#dir-txt").value;
+    const texto = arq ? (await textoDoArquivo(arq, t => carregando("#dir-res", t))).texto : $("#dir-txt").value;
     if (!texto.trim()) throw new Error("Escolha um arquivo ou cole o texto da consulta.");
     if (arq) $("#dir-txt").value = texto;
     fd.append("texto", texto);

@@ -97,7 +97,7 @@ Se o domínio principal também estiver na Vercel, basta incluir no `vercel.json
 - **Zoneamento:** os YAML de cada cidade trazem a estrutura completa, mas os **índices são ilustrativos**
   (`validado: false`). Antes de usar o estudo para decidir, substitua-os pelos da lei vigente e do mapa oficial.
 - **CUB:** não é fixado no código. Informe o valor do mês (Sinduscon-PR, padrão do projeto).
-- **Leitura de documentos:** é heurística e funciona em PDF com texto. Matrícula escaneada exige OCR (ver roadmap).
+- **Leitura de documentos:** é heurística. PDFs são lidos no navegador; páginas escaneadas passam por OCR (Tesseract.js, cerca de 10 s por página). Sempre confira números e nomes com a certidão original.
   O resultado apoia a due diligence e **não substitui** a leitura da certidão por profissional habilitado.
 - **Masterplan:** é um estudo de massa. Não considera topografia nem drenagem.
 

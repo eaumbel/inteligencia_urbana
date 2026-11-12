@@ -11,6 +11,7 @@
 - [x] API + interface web com mapa
 - [x] Camadas oficiais (IBGE: hidrografia, municípios; CAR via proxy), Street View, camadas do usuário (KML/GeoJSON/WMS)
 - [x] Córregos do IBGE → APP automática no masterplan
+- [x] OCR no navegador (Tesseract.js, português) para certidões escaneadas; leitor calibrado com certidão real do 3º RI de Londrina
 - [x] CAR: camada, consulta por clique e sobreposição com a matrícula (proxy com TLS legado só para o SICAR)
 
 ## Fase 2 — Dados oficiais (depende de material do usuário)
@@ -25,7 +26,6 @@
 - [ ] Geoportal de Londrina (SIGLON): verificar se publica lotes/zoneamento em WMS/WFS
 
 ## Fase 3 — Produto
-- [ ] OCR (Tesseract, português) para matrículas escaneadas
 - [ ] Persistência de projetos e estudos (Supabase/Postgres + PostGIS) e login
 - [ ] Relatório de viabilidade em PDF/DOCX com mapa, masterplan e quadros
 - [ ] Topografia: importar curvas de nível/MDE, mapa de declividade (bloqueio de ≥ 30%) e hidrografia
