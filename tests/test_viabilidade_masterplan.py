@@ -66,3 +66,30 @@ def test_api_fluxo_completo():
     assert c.post("/api/geo/kml-features", json={"features": m["features"]}).status_code == 200
     assert c.get("/").status_code == 200
     assert c.post("/api/vocacao", json={"cidade": "Cambé", "zona": "ZR3", "area_terreno_m2": 5000}).status_code == 200
+
+
+def _quadrado_lonlat(lon, lat, d):
+    return {"type": "Polygon", "coordinates": [[[lon - d, lat - d], [lon + d, lat - d], [lon + d, lat + d], [lon - d, lat + d], [lon - d, lat - d]]]}
+
+
+def test_cruzar_car_e_drenagem_offline():
+    from inteligencia_urbana.geo import camadas_oficiais as co
+    from inteligencia_urbana.geo.coordenadas import geo_para_utm
+
+    lon, lat = -51.19, -23.33
+    e, n = geo_para_utm(lon, lat)
+    verts = [(e - 100, n - 100), (e + 100, n - 100), (e + 100, n + 100), (e - 100, n + 100)]
+    car = [
+        {"type": "Feature", "geometry": _quadrado_lonlat(lon, lat, 0.002), "properties": {"cod_imovel": "PR-A", "status_imovel": "AT", "area": 18.0}},
+        {"type": "Feature", "geometry": _quadrado_lonlat(lon + 0.01, lat, 0.0005), "properties": {"cod_imovel": "PR-LONGE"}},
+    ]
+    r = co.cruzar_car(verts, 31982, feicoes=car)
+    assert [s["cod_imovel"] for s in r["sobreposicoes"]] == ["PR-A"]
+    assert r["sobreposicoes"][0]["pct_da_matricula"] == pytest.approx(100, abs=0.5)
+
+    rio = {"type": "Feature", "properties": {"nome": "Córrego Teste"},
+           "geometry": {"type": "LineString", "coordinates": [[lon - 0.01, lat], [lon + 0.01, lat]]}}
+    d = co.drenagem_proxima(verts, 31982, 300, feicoes=[rio])
+    assert d["cursos"][0]["corta_o_imovel"] and d["cursos"][0]["extensao_no_imovel_m"] == pytest.approx(200, abs=2)
+    m = gerar_masterplan(ParametrosMasterplan(perimetro_utm=RET, cursos_dagua_utm=[[(480000, 7417850), (480400, 7417850)]]))
+    assert m.resumo["area_app_m2"] == pytest.approx(400 * 60, rel=1e-3)

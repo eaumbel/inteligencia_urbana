@@ -9,13 +9,14 @@ from __future__ import annotations
 from dataclasses import asdict
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
 from ..documentos.consulta_ippul import analisar_consulta_parcelamento
 from ..documentos.matricula import analisar_matricula
 from ..documentos.pdf import extrair_texto_pdf, normalizar_texto
+from ..geo import camadas_oficiais as co
 from ..geo.kml import features_para_kml, kml_para_kmz, perimetro_para_kml
 from ..legislacao import federal
 from ..legislacao.zoneamento import analisar_vocacao, carregar_cidade, cidades_disponiveis, parametros_zona
@@ -96,6 +97,52 @@ def _download_kml(kml: str, nome: str, kmz: bool) -> Response:
                         headers={"Content-Disposition": f'attachment; filename="{arq}.kmz"'})
     return Response(kml, media_type="application/vnd.google-earth.kml+xml",
                     headers={"Content-Disposition": f'attachment; filename="{arq}.kml"'})
+
+
+# ------------------------------------------------------------------ camadas oficiais
+
+@app.get("/api/camadas", tags=["Camadas oficiais"])
+def api_camadas():
+    return {"wms": co.CAMADAS_WMS}
+
+
+# Proxy só para serviços fixos (nunca uma URL vinda do cliente)
+PROXIES = {"car-wms": co.CAR_WMS, "car-wfs": co.CAR_WFS}
+
+
+@app.get("/api/proxy/{servico}", tags=["Camadas oficiais"])
+def api_proxy(servico: str, request: Request):
+    url = PROXIES.get(servico)
+    if not url:
+        raise HTTPException(404, "Serviço não disponível no proxy")
+    try:
+        corpo, tipo = co.baixar(url, dict(request.query_params))
+    except Exception as e:
+        raise HTTPException(502, f"SICAR não respondeu: {e}")
+    return Response(corpo, media_type=tipo, headers={"Cache-Control": "public, max-age=86400"})
+
+
+class PedidoPerimetro(BaseModel):
+    vertices_utm: list[tuple[float, float]] = Field(..., min_length=3)
+    epsg: int = 31982
+    raio_m: float = Field(300, ge=0, le=5000)
+    feicoes: list[dict] | None = Field(None, description="Feições GeoJSON (lon/lat) já obtidas do WFS pelo navegador")
+
+
+@app.post("/api/camadas/car-sobreposicao", tags=["Camadas oficiais"])
+def api_car(p: PedidoPerimetro):
+    try:
+        return co.cruzar_car(p.vertices_utm, p.epsg, feicoes=p.feicoes)
+    except Exception as e:
+        raise HTTPException(502, f"SICAR não respondeu: {e}")
+
+
+@app.post("/api/camadas/drenagem", tags=["Camadas oficiais"])
+def api_drenagem(p: PedidoPerimetro):
+    try:
+        return co.drenagem_proxima(p.vertices_utm, p.epsg, p.raio_m, feicoes=p.feicoes)
+    except Exception as e:
+        raise HTTPException(502, f"IBGE não respondeu: {e}")
 
 
 # ------------------------------------------------------------------ legislação

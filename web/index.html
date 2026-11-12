@@ -50,6 +50,7 @@
   <button data-aba="viabilidade">Viabilidade</button>
   <button data-aba="masterplan">Masterplan</button>
   <button data-aba="reurb">REURB</button>
+  <button data-aba="camadas">Camadas do mapa</button>
 </nav>
 <main>
 <section>
@@ -130,6 +131,28 @@
     </div>
     <div id="re-res"></div>
   </div>
+
+  <!-- CAMADAS -->
+  <div class="painel" id="p-camadas">
+    <div class="card">
+      <h2>Camadas oficiais</h2>
+      <p class="muted">Ligue e desligue no controle do canto superior direito do mapa. Clique no mapa para consultar
+        as camadas ligadas (CAR e hidrografia) e abrir o Street View do ponto.</p>
+      <table id="cam-lista"></table>
+    </div>
+    <div class="card">
+      <h2>Adicionar camada própria</h2>
+      <label>Arquivo KML ou GeoJSON (ex.: parcelas do SIGEF, lotes da prefeitura, levantamento)</label>
+      <input type="file" id="cam-arq" accept=".kml,.geojson,.json">
+      <label>…ou serviço WMS (ex.: geoportal da prefeitura, INCRA)</label>
+      <div class="grade">
+        <div><input id="cam-wms-url" placeholder="https://servidor/geoserver/wms"></div>
+        <div><input id="cam-wms-layer" placeholder="nome da camada"></div>
+      </div>
+      <button class="btn" id="cam-wms-ir">Adicionar WMS</button>
+      <p class="muted" id="cam-status"></p>
+    </div>
+  </div>
 </section>
 <section><div id="mapa"></div></section>
 </main>
@@ -149,12 +172,154 @@ document.querySelectorAll("#abas button").forEach(b => b.onclick = () => {
 });
 
 // ---------- mapa
-const mapa = L.map("mapa").setView([-23.31, -51.16], 12);
-const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 20, attribution: "Esri World Imagery" });
-const osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" });
-sat.addTo(mapa);
-L.control.layers({ "Satélite": sat, "Mapa": osm }).addTo(mapa);
-let camadaMat = L.layerGroup().addTo(mapa), camadaMp = L.layerGroup().addTo(mapa);
+const mapa = L.map("mapa", { maxZoom: 21 }).setView([-23.31, -51.16], 12);
+const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/";
+const sat = L.tileLayer(ESRI + "World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 21, maxNativeZoom: 19, attribution: "Esri World Imagery" });
+const osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 21, maxNativeZoom: 19, attribution: "© OpenStreetMap" });
+const rotulos = L.tileLayer(ESRI + "Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", { maxZoom: 21, maxNativeZoom: 19, attribution: "Esri" });
+const ruas = L.tileLayer(ESRI + "Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}", { maxZoom: 21, maxNativeZoom: 19, attribution: "Esri" });
+sat.addTo(mapa); rotulos.addTo(mapa);
+const controleCamadas = L.control.layers({ "Satélite": sat, "Mapa (OpenStreetMap)": osm }, { "Nomes e limites": rotulos, "Ruas e rodovias": ruas }).addTo(mapa);
+L.control.scale({ imperial: false }).addTo(mapa);
+let camadaMat = L.layerGroup().addTo(mapa), camadaMp = L.layerGroup().addTo(mapa), camadaCruz = L.layerGroup().addTo(mapa);
+const CAM = {}; // camadas oficiais por id (config vinda da API)
+
+const linksGoogle = (lat, lng) =>
+  `<a target="_blank" rel="noopener" href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}">Street View</a> · ` +
+  `<a target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${lat},${lng}">Google Maps</a> · ` +
+  `<a target="_blank" rel="noopener" href="https://earth.google.com/web/@${lat},${lng},600a,800d,35y,0h,0t,0r">Google Earth</a>`;
+
+const ROTULOS_PROPS = { cod_imovel: "Código CAR", municipio: "Município", area: "Área (ha)", condicao: "Condição", status_imovel: "Status",
+  tipo_imovel: "Tipo", m_fiscal: "Módulos fiscais", dat_criacao: "Inscrição", nome: "Nome", regime: "Regime", tipotrechodrenagem: "Tipo" };
+function tabelaProps(props) {
+  const linhas = Object.entries(props || {}).filter(([k, v]) => v != null && v !== "" && (ROTULOS_PROPS[k] || Object.keys(props).length <= 8))
+    .map(([k, v]) => `<tr><th>${esc(ROTULOS_PROPS[k] || k)}</th><td>${esc(k === "dat_criacao" ? String(v).slice(0, 10) : v)}</td></tr>`).join("");
+  return `<table style="margin-top:4px">${linhas}</table>`;
+}
+
+async function carregarCamadasOficiais() {
+  const { wms } = await (await api("/api/camadas")).json();
+  wms.forEach(c => {
+    const l = L.tileLayer.wms(c.url, { layers: c.layers, format: "image/png", transparent: true, opacity: c.opacidade, maxZoom: 21, attribution: c.fonte });
+    l._cfg = c; CAM[c.id] = c;
+    controleCamadas.addOverlay(l, c.nome);
+  });
+  $("#cam-lista").innerHTML = "<tr><th>Camada</th><th>Fonte</th><th>Escala</th></tr>" +
+    wms.map(c => `<tr><td>${esc(c.nome)}</td><td>${esc(c.fonte)}</td><td>${esc(c.escala)}</td></tr>`).join("");
+}
+
+// Consulta por clique: GetFeatureInfo direto do navegador (os serviços liberam CORS)
+async function infoWMS(cfg, latlng) {
+  const crs = L.CRS.EPSG3857, b = mapa.getBounds(), s = mapa.getSize(), p = mapa.latLngToContainerPoint(latlng);
+  const sw = crs.project(b.getSouthWest()), ne = crs.project(b.getNorthEast());
+  const q = new URLSearchParams({ service: "WMS", version: "1.1.1", request: "GetFeatureInfo", layers: cfg.layers, query_layers: cfg.layers,
+    styles: "", srs: "EPSG:3857", bbox: [sw.x, sw.y, ne.x, ne.y].join(","), width: s.x, height: s.y, x: Math.round(p.x), y: Math.round(p.y),
+    info_format: "application/json", feature_count: 5 });
+  const r = await fetch(cfg.url + "?" + q);
+  if (!r.ok) { let m = `${cfg.fonte} não respondeu (${r.status})`; try { m = (await r.json()).detail || m; } catch {} throw new Error(m); }
+  const d = await r.json();
+  return d.features?.length ? `<div style="margin-top:8px"><b>${esc(cfg.nome)}</b>${d.features.map(f => tabelaProps(f.properties)).join("")}</div>` : "";
+}
+mapa.on("click", async ev => {
+  const { lat, lng } = ev.latlng;
+  let html = `<b>${lat.toFixed(6)}, ${lng.toFixed(6)}</b><br>${linksGoogle(lat.toFixed(6), lng.toFixed(6))}`;
+  const ativas = [];
+  mapa.eachLayer(l => { if (l._cfg?.consultavel) ativas.push(l._cfg); });
+  const popup = L.popup({ maxWidth: 360 }).setLatLng(ev.latlng).setContent(html + (ativas.length ? `<div class="muted">consultando ${ativas.length} camada(s)…</div>` : "")).openOn(mapa);
+  if (!ativas.length) return;
+  const res = await Promise.allSettled(ativas.map(c => infoWMS(c, ev.latlng)));
+  res.forEach(r => html += r.status === "fulfilled" ? r.value : `<div class="alerta">${esc(r.reason.message)}</div>`);
+  popup.setContent(html);
+});
+
+// WFS direto do navegador; bbox [lonMin, latMin, lonMax, latMax]
+async function wfsNavegador(url, camada, bbox, limite = 500) {
+  const q = new URLSearchParams({ service: "WFS", version: "2.0.0", request: "GetFeature", typeNames: camada, outputFormat: "application/json",
+    srsName: "EPSG:4326", count: limite, bbox: `${bbox[1]},${bbox[0]},${bbox[3]},${bbox[2]},urn:ogc:def:crs:EPSG::4326` });
+  const r = await fetch(url + "?" + q);
+  if (!r.ok) { let m = `Serviço respondeu ${r.status}`; try { m = (await r.json()).detail || m; } catch {} throw new Error(m); }
+  return (await r.json()).features || [];
+}
+function bboxMatricula(margemM) {
+  const cs = estado.matricula.geojson.geometry.coordinates[0], d = margemM / 111000;
+  const lons = cs.map(c => c[0]), lats = cs.map(c => c[1]);
+  return [Math.min(...lons) - d, Math.min(...lats) - d, Math.max(...lons) + d, Math.max(...lats) + d];
+}
+function centroMatricula() {
+  const cs = estado.matricula.geojson.geometry.coordinates[0].slice(0, -1);
+  return [cs.reduce((a, c) => a + c[1], 0) / cs.length, cs.reduce((a, c) => a + c[0], 0) / cs.length].map(v => v.toFixed(6));
+}
+const postJSON = async (url, body) => (await api(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
+
+async function cruzarCAR() {
+  const r = estado.matricula, alvo = "#mat-cruz";
+  $(alvo).innerHTML = `<div class="card"><p class="muted">Consultando o SICAR…</p></div>`;
+  try {
+    const feicoes = await wfsNavegador(CAM.car.wfs, CAM.car.layers, bboxMatricula(50));
+    const d = await postJSON("/api/camadas/car-sobreposicao", { vertices_utm: r.vertices.map(v => [v.e, v.n]), epsg: r.epsg, feicoes });
+    camadaCruz.clearLayers();
+    L.geoJSON({ type: "FeatureCollection", features: d.features }, { style: { color: "#b23cfd", weight: 2, dashArray: "6 4", fillOpacity: .12 },
+      onEachFeature: (f, l) => l.bindPopup(`<b>CAR</b>${tabelaProps(f.properties)}`) }).addTo(camadaCruz);
+    $(alvo).innerHTML = `<div class="card"><h2>CAR sobrepostos à matrícula</h2>${alertasHTML(d.alertas)}
+      <table><tr><th>Código</th><th>Sobreposição</th><th>% matrícula</th><th>% do CAR</th><th>Condição</th></tr>
+      ${d.sobreposicoes.map(s => `<tr><td>${esc(s.cod_imovel)}</td><td>${fmt(s.area_sobreposta_m2, 0)} m²</td><td>${fmt(s.pct_da_matricula, 1)}%</td><td>${fmt(s.pct_do_car, 1)}%</td><td>${esc(s.condicao || s.status || "—")}</td></tr>`).join("")}</table>
+      <p class="muted">${esc(d.fonte)}</p></div>`;
+  } catch (e) { erro(alvo, e); }
+}
+
+async function buscarDrenagem() {
+  const r = estado.matricula, alvo = "#mat-cruz", raio = 300;
+  $(alvo).innerHTML = `<div class="card"><p class="muted">Consultando a hidrografia do IBGE…</p></div>`;
+  try {
+    const feicoes = await wfsNavegador(CAM.drenagem.wfs, CAM.drenagem.layers, bboxMatricula(raio));
+    const d = await postJSON("/api/camadas/drenagem", { vertices_utm: r.vertices.map(v => [v.e, v.n]), epsg: r.epsg, raio_m: raio, feicoes });
+    camadaCruz.clearLayers();
+    L.geoJSON({ type: "FeatureCollection", features: d.features }, { style: { color: "#1e88ff", weight: 4 },
+      onEachFeature: (f, l) => l.bindTooltip(`${esc(f.properties.nome)} — ${fmt(f.properties.distancia_m, 0)} m`) }).addTo(camadaCruz);
+    $(alvo).innerHTML = `<div class="card"><h2>Cursos d'água até ${raio} m do imóvel</h2>${alertasHTML(d.alertas)}
+      <table><tr><th>Curso d'água</th><th>Distância</th><th>Corta o imóvel?</th><th>Extensão no imóvel</th></tr>
+      ${d.cursos.map(c => `<tr><td>${esc(c.nome)}</td><td>${fmt(c.distancia_m, 0)} m</td><td>${c.corta_o_imovel ? "sim" : "não"}</td><td>${fmt(c.extensao_no_imovel_m, 0)} m</td></tr>`).join("") || "<tr><td colspan=4>Nenhum curso d'água mapeado no raio.</td></tr>"}</table>
+      ${d.cursos.length ? `<button class="btn sec" id="dren-mp">Usar no masterplan (APP automática)</button>` : ""}<p class="muted">${esc(d.fonte)}</p></div>`;
+    if (d.cursos.length) $("#dren-mp").onclick = () => {
+      estado.cursos = d.cursos.flatMap(c => c.linhas_utm);
+      document.querySelector('[data-aba="masterplan"]').click(); atualizarOrigemMp();
+    };
+  } catch (e) { erro(alvo, e); }
+}
+
+// Camadas do usuário: KML / GeoJSON / WMS
+function kmlParaGeoJSON(texto) {
+  const doc = new DOMParser().parseFromString(texto, "application/xml"), feats = [];
+  const coords = el => el.textContent.trim().split(/\s+/).map(t => t.split(",").slice(0, 2).map(Number));
+  doc.querySelectorAll("Placemark").forEach(pm => {
+    const nome = pm.querySelector("name")?.textContent || "";
+    pm.querySelectorAll("Polygon").forEach(pg => {
+      const aneis = [pg.querySelector("outerBoundaryIs coordinates"), ...pg.querySelectorAll("innerBoundaryIs coordinates")].filter(Boolean).map(coords);
+      feats.push({ type: "Feature", properties: { nome }, geometry: { type: "Polygon", coordinates: aneis } });
+    });
+    pm.querySelectorAll("LineString").forEach(ls => feats.push({ type: "Feature", properties: { nome }, geometry: { type: "LineString", coordinates: coords(ls.querySelector("coordinates")) } }));
+    pm.querySelectorAll("Point").forEach(pt => feats.push({ type: "Feature", properties: { nome }, geometry: { type: "Point", coordinates: coords(pt.querySelector("coordinates"))[0] } }));
+  });
+  return { type: "FeatureCollection", features: feats };
+}
+$("#cam-arq").onchange = async ev => {
+  const arq = ev.target.files[0]; if (!arq) return;
+  try {
+    const txt = await arq.text();
+    const gj = arq.name.toLowerCase().endsWith(".kml") ? kmlParaGeoJSON(txt) : JSON.parse(txt);
+    const l = L.geoJSON(gj, { style: { color: "#00e5ff", weight: 2, fillOpacity: .1 }, onEachFeature: (f, ly) => ly.bindPopup(tabelaProps(f.properties)) }).addTo(mapa);
+    controleCamadas.addOverlay(l, esc(arq.name));
+    mapa.fitBounds(l.getBounds());
+    $("#cam-status").textContent = `${arq.name}: ${(gj.features || []).length} feições adicionadas.`;
+  } catch (e) { $("#cam-status").textContent = "Não foi possível ler o arquivo: " + e.message; }
+};
+$("#cam-wms-ir").onclick = () => {
+  const url = $("#cam-wms-url").value.trim(), camada = $("#cam-wms-layer").value.trim();
+  if (!/^https:\/\//.test(url) || !camada) return $("#cam-status").textContent = "Informe a URL https:// do WMS e o nome da camada.";
+  const l = L.tileLayer.wms(url, { layers: camada, format: "image/png", transparent: true, maxZoom: 21 }).addTo(mapa);
+  controleCamadas.addOverlay(l, esc(camada));
+  $("#cam-status").textContent = `Camada WMS "${camada}" adicionada.`;
+};
 const CORES = { lote: "#f6d58e", via: "#bdbdbd", area_verde: "#7cc576", institucional: "#f2a65a", app: "#2e7d32", remanescente: "#e0e0e0" };
 
 async function api(url, opts = {}) {
@@ -194,15 +359,17 @@ function renderMatricula(r) {
       </div>
       ${alertasHTML(r.alertas)}
       <table style="margin-top:8px">${id}</table>
-      ${r.geojson ? `<button class="btn" id="mat-kml">Baixar KML (Google Earth)</button><button class="btn sec" id="mat-kmz">KMZ</button><button class="btn sec" id="mat-mp">Usar no masterplan</button>` : ""}
+      ${r.geojson ? `<button class="btn" id="mat-kml">Baixar KML (Google Earth)</button><button class="btn sec" id="mat-kmz">KMZ</button><button class="btn sec" id="mat-mp">Usar no masterplan</button>
+        <div style="margin-top:4px"><button class="btn sec" id="mat-sv">Street View</button><button class="btn sec" id="mat-car">CAR sobrepostos</button><button class="btn sec" id="mat-dren">Córregos próximos (IBGE)</button></div>` : ""}
     </div>
+    <div id="mat-cruz"></div>
     <div class="card"><h2>Atos registrais (${r.atos.length})</h2><table>${atos || "<tr><td>Nenhum ato identificado</td></tr>"}</table></div>
     <div class="card"><h2>Memorial descritivo</h2>
       <details ${verts ? "open" : ""}><summary>Vértices (${r.vertices.length})</summary><table><tr><th>Vértice</th><th>E</th><th>N</th></tr>${verts}</table></details>
       <details open><summary>Confrontações (${r.segmentos.length})</summary><table><tr><th>Lance</th><th>Azimute</th><th>Dist. (m)</th><th>Confrontante</th></tr>${segs}</table></details>
       ${r.medidas.length ? `<details open><summary>Medidas lineares</summary><table>${r.medidas.map(m => `<tr><td>${esc(m.lado)}</td><td>${fmt(m.medida_m)} m</td><td>${esc(m.confrontacao)}</td></tr>`).join("")}</table></details>` : ""}
     </div>`;
-  camadaMat.clearLayers();
+  camadaMat.clearLayers(); camadaCruz.clearLayers(); estado.cursos = null;
   if (r.geojson) {
     const g = L.geoJSON(r.geojson, { style: { color: "#ff7a00", weight: 3, fillOpacity: .15 } }).addTo(camadaMat);
     r.geojson.geometry.coordinates[0].slice(0, -1).forEach((c, i) => L.circleMarker([c[1], c[0]], { radius: 4, color: "#fff", fillColor: "#ff7a00", fillOpacity: 1 })
@@ -216,6 +383,9 @@ function renderMatricula(r) {
     };
     $("#mat-kml").onclick = () => kml(false); $("#mat-kmz").onclick = () => kml(true);
     $("#mat-mp").onclick = () => { document.querySelector('[data-aba="masterplan"]').click(); atualizarOrigemMp(); };
+    $("#mat-sv").onclick = () => { const [la, lo] = centroMatricula(); window.open(`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${la},${lo}`, "_blank", "noopener"); };
+    $("#mat-car").onclick = cruzarCAR;
+    $("#mat-dren").onclick = buscarDrenagem;
     $("#zon-area").value = Math.round(r.area_calculada_m2 || r.area_declarada_m2 || 0);
   }
 }
@@ -343,7 +513,7 @@ $("#mp-ir").onclick = async () => {
   atualizarOrigemMp();
   if (!perimetroMp) return erro("#mp-res", "Sem perímetro: analise uma matrícula com coordenadas ou use o exemplo.");
   try {
-    const body = { ...lerForm("#mp-form"), perimetro_utm: perimetroMp, epsg: epsgMp };
+    const body = { ...lerForm("#mp-form"), perimetro_utm: perimetroMp, epsg: epsgMp, cursos_dagua_utm: estado.cursos || [] };
     const m = await (await api("/api/masterplan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
     estado.masterplan = m;
     $("#mp-res").innerHTML = `<div class="card"><h2>Resultado</h2>${alertasHTML(m.alertas)}<div id="mp-svg">${m.svg}</div>
@@ -376,7 +546,7 @@ $("#re-ir").onclick = async () => {
   } catch (e) { erro("#re-res", e); }
 };
 
-carregarCidades(); montarViabilidade(); montarMasterplan();
+carregarCidades(); montarViabilidade(); montarMasterplan(); carregarCamadasOficiais();
 </script>
 </body>
 </html>
