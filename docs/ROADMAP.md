@@ -28,11 +28,12 @@
 
 ## Fase 3 — Produto
 - [x] Imagem de apresentação do masterplan sobre o satélite (PNG)
-- [ ] Traçado orgânico: vias curvas acompanhando o relevo (exige topografia/MDE), rotatórias e praças lineares
+- [x] Traçado orgânico: ruas paralelas às curvas de nível (SRTM), transversais descendo a encosta, declividade ≥ 30% fora dos lotes
+- [ ] Rotatórias, praças lineares e importação de levantamento planialtimétrico (DXF/curvas) no lugar do SRTM
 - [ ] Estilização por IA da prancha (opcional, serviço externo de imagem)
 - [ ] Persistência de projetos e estudos (Supabase/Postgres + PostGIS) e login
 - [ ] Relatório de viabilidade em PDF/DOCX com mapa, masterplan e quadros
-- [ ] Topografia: importar curvas de nível/MDE, mapa de declividade (bloqueio de ≥ 30%) e hidrografia
+- [x] Topografia preliminar (SRTM): curvas de nível, declividade e bloqueio de ≥ 30%
 - [x] Masterplan com diretrizes viárias do IPPUL (vias previstas com largura oficial, fundo de vale, 12% de áreas públicas)
 - [ ] Masterplan com quadras não ortogonais e local preferencial da área institucional indicado no croqui
 - [ ] Cenários e sensibilidade (preço, velocidade de vendas, custo, juros) e correção das parcelas (IPCA/INCC)

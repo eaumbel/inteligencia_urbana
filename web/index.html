@@ -123,6 +123,7 @@ ul{padding-left:20px;margin:6px 0} li{margin:3px 0}
 .leaflet-tooltip.medida{background:rgba(20,22,25,.82);color:#fff;border:0;border-radius:6px;padding:2px 6px;font:700 11.5px/1.3 var(--font-body);box-shadow:none;white-space:nowrap}
 .leaflet-tooltip.medida::before{display:none}
 .leaflet-tooltip.medida-area{background:var(--accent);font-size:12.5px;padding:4px 8px}
+.leaflet-tooltip.medida-cota{background:rgba(141,110,99,.9);font-size:10px;padding:0 4px}
 .leaflet-tooltip.medida-lote{background:rgba(255,255,255,.9);color:#1f2a24;font-size:10px;line-height:1.15;text-align:center;padding:1px 4px}
 .leaflet-container.desenhando{cursor:crosshair}
 .etapa-h{display:flex;gap:14px;align-items:flex-start}
@@ -1124,13 +1125,21 @@ function montarForm(alvo, schema, ignorar = []) {
   $(alvo).innerHTML = Object.entries(schema.properties).filter(([k]) => !ignorar.includes(k)).map(([k, p]) => {
     const tipo = p.type || (p.anyOf && p.anyOf.find(x => x.type !== "null")?.type);
     const req = (schema.required || []).includes(k);
-    const rotulo = rotuloCampo(k);
-    return `<div><label title="${esc(p.description || "")}">${esc(rotulo)}${req ? " *" : ""}</label><input data-campo="${k}" type="number" step="any" value="${p.default ?? ""}" ${req ? "required" : ""} placeholder="${esc(p.description || "")}"></div>`;
+    const rotulo = ROTULOS_ESPECIAIS[k] || rotuloCampo(k);
+    const titulo = `<label title="${esc(p.description || "")}">${esc(rotulo)}${req ? " *" : ""}</label>`;
+    if (p.enum) return `<div>${titulo}<select data-campo="${k}" data-tipo="texto">${p.enum.map(v => `<option value="${v}" ${v === p.default ? "selected" : ""}>${esc(OPCOES[v] || v)}</option>`).join("")}</select></div>`;
+    if (tipo === "boolean") return `<div>${titulo}<select data-campo="${k}" data-tipo="bool"><option value="true" ${p.default ? "selected" : ""}>Sim</option><option value="false" ${p.default ? "" : "selected"}>Não</option></select></div>`;
+    return `<div>${titulo}<input data-campo="${k}" type="number" step="any" value="${p.default ?? ""}" ${req ? "required" : ""} placeholder="${esc(p.description || "")}"></div>`;
   }).join("");
 }
+const ROTULOS_ESPECIAIS = { tracado: "Traçado das ruas", usar_relevo: "Usar relevo (topografia)", declividade_maxima_pct: "Declividade máxima para lotes (%)" };
+const OPCOES = { organico: "Orgânico (acompanha o relevo)", ortogonal: "Ortogonal (malha reta)" };
 function lerForm(alvo) {
   const o = {};
-  document.querySelectorAll(`${alvo} [data-campo]`).forEach(i => { if (i.value !== "") o[i.dataset.campo] = Number(i.value); });
+  document.querySelectorAll(`${alvo} [data-campo]`).forEach(i => {
+    if (i.value === "") return;
+    o[i.dataset.campo] = i.dataset.tipo === "texto" ? i.value : i.dataset.tipo === "bool" ? i.value === "true" : Number(i.value);
+  });
   return o;
 }
 async function montarViabilidade() {
@@ -1255,7 +1264,10 @@ function quadroMasterplan(r) {
     <div class="kpi"><small>Área verde</small><b>${fmt(r.pct_verde, 1)}%</b></div>
     <div class="kpi"><small>Institucional</small><b>${fmt(r.pct_institucional, 1)}%</b></div>
     <div class="kpi"><small>APP / fundo de vale</small><b>${fmt(r.area_app_m2, 0)} m²</b></div>
-  </div>`;
+    ${r.relevo?.cota_min_m != null ? `<div class="kpi"><small>Relevo (cotas)</small><b>${fmt(r.relevo.cota_min_m, 0)}–${fmt(r.relevo.cota_max_m, 0)} m</b></div>
+    <div class="kpi"><small>Declividade média</small><b>${fmt(r.relevo.declividade_media_pct, 1)}%</b></div>` : ""}
+    ${r.area_declividade_excessiva_m2 ? `<div class="kpi"><small>Declividade ≥ limite</small><b>${fmt(r.area_declividade_excessiva_m2, 0)} m²</b></div>` : ""}
+  </div>${r.relevo?.fonte ? `<p class="muted" style="margin:6px 0 0">Relevo: ${esc(r.relevo.fonte)}; curvas a cada ${fmt(r.relevo.intervalo_curvas_m, 0)} m. O projeto exige levantamento planialtimétrico.</p>` : ""}`;
 }
 const baixarKmlMasterplan = async m => baixar(await (await api("api/geo/kml-features", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome: "Masterplan", features: m.features }) })).blob(), "masterplan.kml");
 async function levarParaViabilidade(m) {
@@ -1271,6 +1283,12 @@ const camadaRotulosMp = L.layerGroup().addTo(mapa);
 const NOMES_TIPO = { area_verde: "Área verde", institucional: "Institucional", app: "APP / fundo de vale", remanescente: "Remanescente" };
 function desenharMasterplan(m, ajustar = false) {
   camadaMp.clearLayers(); camadaRotulosMp.clearLayers();
+  if (m.curvas_nivel?.length) {
+    L.geoJSON({ type: "FeatureCollection", features: m.curvas_nivel }, { interactive: false,
+      style: f => ({ color: "#8d6e63", weight: f.properties.mestra ? 1.6 : .7, opacity: f.properties.mestra ? .9 : .6 }),
+      onEachFeature: (f, l) => { if (f.properties.mestra) l.bindTooltip(`${fmt(f.properties.cota_m, 0)} m`, { permanent: true, direction: "center", className: "medida medida-cota" }); },
+    }).addTo(camadaMp);
+  }
   const g = L.geoJSON({ type: "FeatureCollection", features: m.features }, {
     style: f => ({ color: f.properties.diretriz ? "#ff7f00" : "#444", weight: f.properties.tipo === "lote" ? .6 : f.properties.diretriz ? 2 : 1,
       fillColor: CORES[f.properties.tipo] || "#ccc", fillOpacity: f.properties.tipo === "app" ? .45 : .8, dashArray: f.properties.diretriz ? "6 4" : null }),
@@ -1361,6 +1379,12 @@ async function gerarImagemApresentacao(m, { largura = 2400, titulo = "Masterplan
   const sombra = (blur, dy) => { ctx.shadowColor = "rgba(0,0,0,.35)"; ctx.shadowBlur = blur; ctx.shadowOffsetX = dy * .6; ctx.shadowOffsetY = dy; };
   const semSombra = () => { ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetX = ctx.shadowOffsetY = 0; };
 
+  // curvas de nível sobre o satélite (mestras mais marcadas, com cota)
+  (m.curvas_nivel || []).forEach(f => {
+    const cs = f.geometry.type === "LineString" ? [f.geometry.coordinates] : f.geometry.coordinates;
+    ctx.strokeStyle = f.properties.mestra ? "rgba(255,236,200,.85)" : "rgba(255,236,200,.45)"; ctx.lineWidth = f.properties.mestra ? 2.2 : 1.1;
+    cs.forEach(ln => { ctx.beginPath(); ln.forEach((c, i) => { const [x, y] = P(c); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke(); });
+  });
   // 2) APP / fundo de vale: mata do satélite visível, com véu verde e limite tracejado
   doTipo("app").forEach(f => { const p = caminho(f); ctx.fillStyle = "rgba(46,125,50,.28)"; ctx.fill(p, "evenodd");
     ctx.setLineDash([m2px(4), m2px(3)]); ctx.strokeStyle = "rgba(200,255,200,.95)"; ctx.lineWidth = Math.max(2, m2px(.8)); ctx.stroke(p); ctx.setLineDash([]); });
@@ -1441,13 +1465,14 @@ async function gerarImagemApresentacao(m, { largura = 2400, titulo = "Masterplan
   (subtitulo || "").split("\n").forEach(l => { ctx.fillText(l, X + 50, y); y += 32; });
   y += 30;
   const leg = [["#cfe0a7", "Lotes"], ["#555a60", "Sistema viário"], ["#86b85a", "Área verde / praça"], ["#ead7b0", "Área institucional"],
-    ["rgba(46,125,50,.6)", "APP / fundo de vale"], ["#ffffff", "Perímetro do imóvel"]];
+    ["rgba(46,125,50,.6)", "APP / fundo de vale"], ["#ffffff", "Perímetro do imóvel"]].concat(m.curvas_nivel?.length ? [["rgba(255,236,200,.9)", `Curvas de nível (${fmt(m.resumo.relevo?.intervalo_curvas_m || 0, 0)} m)`]] : []);
   ctx.font = "600 24px Manrope, Arial, sans-serif";
   leg.forEach(([cor, nome]) => { ctx.fillStyle = cor; ctx.beginPath(); ctx.roundRect(X + 50, y - 22, 34, 26, 5); ctx.fill(); ctx.fillStyle = "#e8eaed"; ctx.fillText(nome, X + 100, y); y += 44; });
   y += 20; ctx.strokeStyle = "#2a2e33"; ctx.beginPath(); ctx.moveTo(X + 50, y); ctx.lineTo(largura - 50, y); ctx.stroke(); y += 50;
   const rs = m.resumo, linhas = [["Área do imóvel", `${fmt(rs.area_gleba_m2, 0)} m²`], ["Lotes", `${rs.numero_lotes}`], ["Lote médio", `${fmt(rs.lote_medio_m2, 0)} m²`],
     ["Lotes (% da área)", `${fmt(rs.pct_lotes, 1)}%`], ["Sistema viário", `${fmt(rs.pct_vias, 1)}%`], ["Área verde", `${fmt(rs.pct_verde, 1)}%`],
-    ["Institucional", `${fmt(rs.pct_institucional, 1)}%`], ["APP / fundo de vale", `${fmt(rs.area_app_m2, 0)} m²`]];
+    ["Institucional", `${fmt(rs.pct_institucional, 1)}%`], ["APP / fundo de vale", `${fmt(rs.area_app_m2, 0)} m²`]]
+    .concat(rs.relevo?.cota_min_m != null ? [["Cotas do terreno", `${fmt(rs.relevo.cota_min_m, 0)}–${fmt(rs.relevo.cota_max_m, 0)} m`], ["Declividade média", `${fmt(rs.relevo.declividade_media_pct, 1)}%`]] : []);
   linhas.forEach(([k, v]) => { ctx.fillStyle = "#aeb6bf"; ctx.font = "500 24px Manrope, Arial, sans-serif"; ctx.fillText(k, X + 50, y);
     ctx.fillStyle = "#fff"; ctx.font = "700 26px Manrope, Arial, sans-serif"; ctx.textAlign = "right"; ctx.fillText(v, largura - 50, y); ctx.textAlign = "left"; y += 44; });
   // norte
