@@ -21,6 +21,7 @@ from ..documentos.matricula import (
 NAO_IDENTIFICADO = "Não identificado no documento analisado."
 CONFIANCA_BAIXA = 70.0  # % (OCR)
 # linhas de cabeçalho/rodapé repetidas em cada folha (não contam como conteúdo do ato)
+AV_LETRA_RE = re.compile(r"(?i:averba[çc][ãa]o)\s+(?i:n)\.?\s*[º°o]?\.?\s*(\d[\d.,]*\d)\s*/\s*([A-Z])\b")
 CABECALHO_RE = re.compile(r"REP[ÚU]BLICA\s+FEDERATIVA|SERVI[ÇC]O\s+DE\s+REGISTRO|REGISTRO\s+(?:GERAL|DE\s+IM[ÓO]VEIS)|OFICIAL|TITULAR|"
                           r"Rua\s|Fone|Sala\s+\d|Andar|FOLHA|FICHA|MATR[ÍI]CULA\s*(?:N|:)|CONTINUA|CNM\s|Valide|documento|"
                           r"CIRCUNSCRI|ESTADO\s+DO|COMARCA|^\W{0,3}\S{0,12}\W{0,3}$", re.I)
@@ -233,7 +234,26 @@ def _atos(doc: _Documento, numero: str | None) -> list[Ato]:
         suf = _digitos(m.group(4))
         if (suf and alvo and suf != alvo) or (not suf and (com_sufixo or (alvo and m.group(3)))):
             continue
-        marcas.append((m.start(), (m.group(1) or "R").upper(), int(m.group(2) or m.group(3))))
+        marcas.append((m.start(), (m.group(1) or "R").upper(), int(m.group(2) or m.group(3)), ""))
+    # OCR ruim no início do ato ("Xf-20-284 - HIPOTECA", "&37-284", "R. 87.284 -"): no começo da linha, nº do ato
+    # seguido do nº desta matrícula e do título. Só com o nº da matrícula conhecido, para não confundir com outros números.
+    if alvo and len(alvo) >= 3:
+        conhecidos = {n for _, _, n, _ in marcas}
+        num_rx = r"[.,\s]?".join(alvo)
+        for m in re.finditer(r"(?m)^\W{0,3}([A-Za-z$&]{0,3})\W{0,2}\s?(\d{1,3})\s?[\-–.]{1,2}\s?" + num_rx +
+                             r"\b(?=\W{0,4}\s*[A-Za-zÀ-ú]{3})", t):
+            n = int(m.group(2))
+            if n in conhecidos or n == 0:
+                continue
+            tipo = "AV" if re.search(r"[AV]", m.group(1).upper()) and "R" not in m.group(1).upper() else "R"
+            marcas.append((m.start(2) - len(m.group(1)), tipo, n, ""))
+            conhecidos.add(n)
+    # fichas antigas: averbações identificadas por letra ("Averbação nº 58.028/A"), antes da numeração dos atos
+    for m in AV_LETRA_RE.finditer(t):
+        if REFERENCIA_RE.search(t[max(0, m.start() - 40):m.start()]) or (alvo and _digitos(m.group(1)) != alvo):
+            continue
+        marcas.append((m.start(), "AV", 0, m.group(2).upper()))
+    marcas.sort()
 
     # o último ato termina onde começa o bloco de certificação da certidão
     fim_atos = len(t)
@@ -241,15 +261,15 @@ def _atos(doc: _Documento, numero: str | None) -> list[Ato]:
         cert = re.search(r"CERTID[ÃA]O\s+N[º°o.]|CERT[IÍ]FICO\s+(?:nos\s+termos|que)|certifica-se", t[marcas[-1][0]:], re.I)
         if cert:
             fim_atos = marcas[-1][0] + cert.start()
-    blocos: dict[tuple[str, int], list[tuple[int, int]]] = {}
-    for i, (ini, tipo, num) in enumerate(marcas):
+    blocos: dict[tuple[str, int, str], list[tuple[int, int]]] = {}
+    for i, (ini, tipo, num, letra) in enumerate(marcas):
         fim = marcas[i + 1][0] if i + 1 < len(marcas) else fim_atos
         if fim - ini < 25:
             continue
-        blocos.setdefault((tipo, num), []).append((ini, fim))
+        blocos.setdefault((tipo, num, letra), []).append((ini, fim))
 
     atos = []
-    for (tipo, num), trechos in blocos.items():
+    for (tipo, num, letra), trechos in blocos.items():
         ini0 = trechos[0][0]
         corpo = "\n".join(t[a:b].strip() for a, b in trechos)
         paginas = sorted({pg for a, b in trechos for pg in doc.paginas_entre(a, b) if pg == doc.pagina_de(a).numero
@@ -265,15 +285,17 @@ def _atos(doc: _Documento, numero: str | None) -> list[Ato]:
         confs = [p.confianca for p in doc.paginas if p.numero in paginas and p.confianca is not None]
         metodo = "ocr" if any(p.metodo == "ocr" for p in doc.paginas if p.numero in paginas) or doc.ocr else "texto"
         atos.append(Ato(
-            id=f"{tipo}-{num}", tipo=tipo, numero=num, data=data, data_texto=data_txt, data_origem=origem,
+            id=f"{tipo}-{letra or num}", tipo=tipo, numero=num, data=data, data_texto=data_txt, data_origem=origem,
             paginas=paginas, categorias=cats, texto_original=corpo[:4000], metodo=metodo,
             confianca=min(confs) if confs else None, fonte=doc.fonte(ini0, corpo[:300]),
         ))
-    return sorted(atos, key=lambda a: (a.numero, a.tipo != "R"))
+    ordem = {id(a): i for i, a in enumerate(sorted(atos, key=lambda a: t.find(a.texto_original[:60])))}
+    # em ordem de número; as averbações com letra (número 0) vêm antes, na ordem em que aparecem
+    return sorted(atos, key=lambda a: (a.numero, a.tipo != "R", ordem[id(a)]))
 
 
 def _sequencia(atos: list[Ato], ultimo_certificado: int | None) -> dict:
-    nums = [a.numero for a in atos]
+    nums = [a.numero for a in atos if a.numero]  # averbações com letra ficam fora da numeração
     numeracao_unica = len(nums) == len(set(nums))  # registro contínuo: R-1, AV-2, R-3...
     faltantes = []
     if atos and numeracao_unica:
@@ -281,7 +303,7 @@ def _sequencia(atos: list[Ato], ultimo_certificado: int | None) -> dict:
         faltantes = [n for n in range(1, topo + 1) if n not in set(nums)]
     elif atos:
         for tipo in ("R", "AV"):
-            ns = sorted(a.numero for a in atos if a.tipo == tipo)
+            ns = sorted(a.numero for a in atos if a.tipo == tipo and a.numero)
             if ns:
                 faltantes += [f"{tipo}-{n}" for n in range(1, ns[-1] + 1) if n not in ns]
     datas = [a.data for a in atos if a.data]
@@ -348,7 +370,7 @@ def extrair(paginas: list[Pagina]) -> Extracao:
     area = getattr(base, "area_declarada_txt", None) or (f"{base.area_declarada_m2:,.2f} m²".replace(",", "X").replace(".", ",").replace("X", ".") if base.area_declarada_m2 else None)
     imovel = {
         "tipo": Campo(base.tipo_imovel if base.tipo_imovel != "indefinido" else None),
-        "area": doc.campo(area),
+        "area": Campo(re.sub(r"(?<=\d)\s*m\s*[?º°ê2](?!\w)", " m²", area), doc.campo(area).fonte) if area else Campo(None),
         "lote": doc.campo(base.lote, r"\blote\b[^\n]{0,20}" + re.escape(str(base.lote)) if base.lote else None),
         "quadra": doc.campo(base.quadra, r"quadra[^\n]{0,20}" + re.escape(str(base.quadra)) if base.quadra else None),
         "loteamento": doc.campo(base.loteamento),

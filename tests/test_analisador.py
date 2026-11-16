@@ -179,3 +179,59 @@ def test_api_relatorio_pdf():
     assert 'relatorio-matricula-50001.pdf' in r.headers["content-disposition"] and r.content.startswith(b"%PDF")
     d = c.post("/api/analisador/extrair", json={"paginas": [{"numero": 1, "texto": CADEIA[0].texto}]}).json()
     assert d["analise"]["proprietarios_atuais"] == ["PEDRO TESTE", "PAULA TESTE"]
+
+
+# ---------------------------------------------------------------- formatos de cartórios reais (textos fictícios)
+
+def test_formato_registro_n_e_averbacao_com_letra():
+    """2º RI de Londrina: "Averbação nº 58.028/A" (ficha antiga) e "Registro nº 1/58.028"; carimbo de assinatura digital."""
+    e = extrair([
+        Pagina(1, """Documento Assinado Digitalmente por FULANA DE TAL. CPF: 00000000000
+2º SERVIÇO DE REGISTRO DE IMÓVEIS DA COMARCA DE LONDRINA/PR
+Matrícula nº 70.001
+DATA:- 07 de Dezembro de 1.999.-
+IDENTIFICAÇÃO DO IMÓVEL:- Lote de terras sob nº 10-A, com a área de 20.000,00 m?, da Gleba Fictícia.
+PROPRIETÁRIOS:- JOÃO EXEMPLO, brasileiro, agricultor, casado com MARIA EXEMPLO.
+MATRÍCULA DO INCRA:- código 000.000.000.000-0.
+Averbação nº 70.001/A (RESTAURAÇÃO DE FLORESTA)
+DATA:- 07 de Dezembro de 1.999.- FINALIDADE:- Averbação de restauração de floresta."""),
+        Pagina(2, """Registro nº 1/70.001 (Compra e Venda)
+DATA:- 5 de Janeiro de 2001.-
+TRANSMITENTE:- JOÃO EXEMPLO, brasileiro, casado. ADQUIRENTE:- PEDRO TESTE, brasileiro, solteiro.
+FORMA DO TÍTULO:- Escritura Pública de Compra e Venda. VALOR:- R$10.000,00.
+Registro nº 2/70.001
+DATA:- 3 de Agosto de 2005.-
+TRANSMITENTE:- PEDRO TESTE, brasileiro. ADQUIRENTE:- ANA TESTE, brasileira, divorciada.
+FORMA DO TÍTULO:- Formal de Partilha, expedido dos autos nº 570/2004, de divórcio consensual.
+VALOR:- R$75.000,00."""),
+    ])
+    assert e.identificacao["numero_matricula"].valor == "70.001"
+    assert [a.id for a in e.atos] == ["AV-A", "R-1", "R-2"]
+    assert e.sequencia["faltantes"] == []
+    assert e.imovel["tipo"].valor == "rural" and e.imovel["area"].valor.endswith("m²")
+    an = analisar(e)
+    assert {a.id: a.natureza for a in an.atos}["R-2"] == "partilha/inventário"  # título no campo FORMA DO TÍTULO
+    assert an.proprietario_inicial["nomes"] == ["JOÃO EXEMPLO"]
+    assert an.proprietarios_atuais == ["ANA TESTE"] and not an.alertas_cadeia
+
+
+def test_formato_r_hifen_matricula_e_ocr_ruim():
+    """4º RI de Londrina: "R-1-284 —- COMPRA", "R.39-284", "AV.129-284" e início do ato corrompido pelo OCR."""
+    e = extrair([Pagina(1, """CERTIDÃO Nº 1
+REGISTRO GERAL Matrícula No...
+284
+R-1-284 —- COMPRA E VENDA:- Consoante Escritura Publica, JOSÉ FICTÍCIO, ja qualificado, VENDE ao outorgado
+comprador, PAULO EXEMPLO, brasileiro, a parte ideal correspondente a 1.000,00 metros quadrados.
+R=-2-284 - COMPRA E VENDA:- Consoante Escritura Publica, PAULO EXEMPLO, ja qualificado, VENDE ao outorgado
+comprador, CARLOS TESTE, brasileiro, a parte ideal de 500,00 m2.
+Xf-3-284 - PENHORA:- Prenot. sob nº 5840 - Conforme Mandado extraído dos autos nº 0000001-11.2019.8.16.0014.
+AV.4-284 - CANCELAMENTO DE PENHORA:- Termo de Levantamento Parcial da Penhora, fica cancelada a PENHORA
+registrada sob nº 3 desta matrícula.""")])
+    assert e.identificacao["numero_matricula"].valor == "284"
+    assert [a.id for a in e.atos] == ["R-1", "R-2", "R-3", "AV-4"]
+    an = analisar(e)
+    assert [(t.ato, t.de, t.para, t.fracao) for t in an.transmissoes] == [
+        ("R-1", ["JOSÉ FICTÍCIO"], ["PAULO EXEMPLO"], "1.000,00 m²"), ("R-2", ["PAULO EXEMPLO"], ["CARLOS TESTE"], "500,00 m²")]
+    assert an.cotitularidade and an.proprietarios_atuais == []  # partes ideais: lista de donos não é deduzida
+    o = an.onus[0]
+    assert (o.ato, o.situacao, o.ato_baixa) == ("R-3", "PARCIALMENTE CANCELADA", "AV-4")

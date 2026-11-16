@@ -177,9 +177,10 @@ def _datum(texto: str) -> tuple[str | None, int]:
 # ---------------------------------------------------------------- atos
 
 ATO_RE = re.compile(
-    r"(?<![A-Za-z])(?:(R|AV|Av)\s*[\.\-–]?\s*(\d{1,3})|REGISTRO\s+n\.?\s*[º°o]\.?\s*\.?\s*(\d{1,3})(?=\s*/))"
-    r"(?:\s*/\s*(\d[\d.,]*\d))?"
-    r"(?=\s*[\-–/:.,|]|\s+(?:em|-|de)\b|\s*$)",
+    r"(?<![A-Za-z])(?:(R|AV|Av)\s*[\.\-–=]{0,2}\s*(\d{1,3})|(?i:REGISTRO)\s+(?i:n)\.?\s*[º°o]\.?\s*\.?\s*(\d{1,3})(?=\s*/))"
+    # sufixo com o nº da matrícula: "R-1/32.185" ou "R-1-284" (hífen colado; nunca uma data "R-2 - 10/03/2015")
+    r"(?:(?:\s*/\s*|\s?[\-–]\s?)(\d[\d.,]*\d)(?![/\d]))?"
+    r"(?=\s*[\-–—=/:.,;|(]|\s+(?:em|-|de)\b|\s*$)",
     re.M,
 )
 
@@ -396,7 +397,8 @@ def _medidas_lineares(texto: str) -> list[MedidaLinear]:
 
 CARIMBO_RE = re.compile(
     r"consultar\s+a\s+autenticidade|aripar\.org|e-validador|c[óo]digo\s+de\s+verifica|consulta\s+dispon[íi]vel|"
-    r"^\s*p[áa]gina\s*:?\s*\d*\s*/?\s*\d*\s*$|valide\s+aqui|^\s*este\s+documento\s*$|sptth|rb\.gro|^\s*\S{1,10}\s*$",
+    r"^\s*p[áa]gina\s*:?\s*\d*\s*/?\s*\d*\s*$|valide\s+aqui|assinado\s+digitalmente|verificar\s+a\s+autenticidade|"
+    r"registradores\.onr|digite\s+o\s+hash|^\s*este\s+documento\s*$|sptth|rb\.gro|^\s*\S{1,10}\s*$",
     re.I,
 )
 
@@ -510,6 +512,9 @@ def analisar_matricula(texto: str, epsg: int | None = None) -> ResultadoMatricul
     rural = re.search(r"\b(ccir|incra|gleba|ch[áa]cara|s[íi]tio|fazenda|im[óo]vel rural|alqueires?|\bITR\b|reserva legal)\b", identificacao, re.I)
     urbano = re.search(r"\b(lote\s|quadra\s|data\s+de\s+terras|apartamento|edif[íi]cio|condom[íi]nio|inscri[çc][ãa]o imobili[áa]ria|zona urbana|per[íi]metro urbano)", identificacao, re.I)
     r.tipo_imovel = "rural" if rural and not urbano else "urbano" if urbano else "rural" if rural else "indefinido"
+    # CCIR/INCRA/ITR na matrícula (abertura ou atos) indicam cadastro rural, salvo unidade de edifício
+    if re.search(r"\bccir\b|\bincra\b|im[óo]vel\s+rural|\bITR\b", texto, re.I) and not re.search(r"apartamento|unidade\s+aut[ôo]noma", identificacao, re.I):
+        r.tipo_imovel = "rural"
 
     r.datum, epsg_detectado = _datum(texto)
     r.epsg = epsg or epsg_detectado

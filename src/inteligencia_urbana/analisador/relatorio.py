@@ -191,6 +191,16 @@ def gerar_pdf(ext: Extracao, an: Analise, arquivo: str | None = None, hoje: date
                          Paragraph(escape(f"Base: {ultimo.ato}, pág. {', '.join(map(str, ultimo.paginas))}." if ultimo else
                                           "Base: abertura da matrícula (nenhuma transmissão posterior identificada)."), st["nota"])],
                         FUNDO, DESTAQUE))
+    elif an.cotitularidade:
+        txt = [Paragraph("<b>O imóvel tem vários donos ao mesmo tempo, cada um com uma parte (condomínio).</b>", st["p"]),
+               Paragraph("Por isso o sistema não monta sozinho a lista completa de donos atuais: ela precisa ser conferida no "
+                         "Registro de Imóveis.", st["p"])]
+        if an.ultimos_adquirentes:
+            txt.append(Paragraph("Últimos que receberam uma parte, pelo texto lido:", st["nota"]))
+            for u in reversed(an.ultimos_adquirentes):
+                txt.append(Paragraph(escape(f"{dbr(u['data'])} — {', '.join(u['nomes'])}" + (f" ({u['fracao']})" if u['fracao'] else "")
+                                            + f" — {u['ato']}"), st["nota"]))
+        L.append(_caixa(txt, FUNDO, ALERTA))
     else:
         L.append(_caixa([Paragraph("Não foi possível identificar com segurança quem é o dono atual.", st["p"])], FUNDO, ALERTA))
     L.append(Paragraph("Como o imóvel passou de mão em mão", st["h2"]))

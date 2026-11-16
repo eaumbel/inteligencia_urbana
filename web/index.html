@@ -688,7 +688,7 @@ async function workerOCR(aviso) {
   return tessPromessa;
 }
 // linhas do carimbo de autenticidade das certidões digitais não contam como conteúdo
-const CARIMBO = /consultar\s+a\s+autenticidade|aripar\.org|e-validador|c[óo]digo\s+de\s+verifica|consulta\s+dispon[íi]vel|^\s*p[áa]gina|valide\s+aqui|^\s*este\s+documento\s*$|sptth|rb\.gro/i;
+const CARIMBO = /assinado\s+digitalmente|verificar\s+a\s+autenticidade|registradores\.onr|digite\s+o\s+hash|^\s*certid[ãa]o\s+n[º°o.]*\s*[\d.]+\s*\|?\s*$|consultar\s+a\s+autenticidade|aripar\.org|e-validador|c[óo]digo\s+de\s+verifica|consulta\s+dispon[íi]vel|^\s*p[áa]gina|valide\s+aqui|^\s*este\s+documento\s*$|sptth|rb\.gro/i;
 const conteudoUtil = t => t.split("\n").filter(l => l.trim().length > 10 && !CARIMBO.test(l)).join("").replace(/\s/g, "").length;
 
 async function textoDoArquivo(arq, aviso) {
@@ -1877,7 +1877,7 @@ function azDashboard() {
       ${azInd("Número da matrícula", i.numero_matricula)}${azInd("Cartório de registro", i.cartorio)}${azInd("Comarca", i.comarca)}
       ${azInd("Município / UF", { valor: [i.municipio.valor, i.uf.valor].filter(Boolean).join(" / ") || null, fonte: i.municipio.fonte })}
       ${azInd("Área registrada", im.area)}${azInd("Tipo de imóvel", im.tipo)}
-      ${azInd("Proprietário atual", { valor: an.proprietarios_atuais.join(", ") || null, fonte: ult && { pagina: ult.paginas[0], trecho: "" } }, v => `${esc(v)} <span class="muted" style="font-size:12px">(${ult ? ult.ato : "abertura"})</span>`)}
+      ${an.cotitularidade && !an.proprietarios_atuais.length ? `<div class="az-ind"><small>Proprietário atual</small><b>Vários donos (condomínio)</b><span class="muted" style="font-size:12px">A lista completa precisa ser conferida</span></div>` : azInd("Proprietário atual", { valor: an.proprietarios_atuais.join(", ") || null, fonte: ult && { pagina: ult.paginas[0], trecho: "" } }, v => `${esc(v)} <span class="muted" style="font-size:12px">(${ult ? ult.ato : "abertura"})</span>`)}
       ${azInd("Abertura da matrícula", i.data_abertura, dataBR)}${azInd("Emissão da certidão", i.data_emissao, dataBR)}
     </div></div>
     <div class="card"><h2>Atos e ônus</h2><div class="az-grid">

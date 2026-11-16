@@ -51,15 +51,15 @@ NATUREZAS = [
     ("incorporação imobiliária", r"incorpora[çc][ãa]o\s+(?:imobili|registrad)|memorial\s+de\s+incorpora|patrim[ôo]nio\s+de\s+afeta"),
     ("instituição de condomínio", r"institui[çc][ãa]o\s+de\s+condom|especifica[çc][ãa]o\s+de\s+condom"),
 ]
-TRANSMISSOES = {"compra e venda", "doação", "partilha/inventário", "permuta", "arrematação", "adjudicação", "usucapião",
+TRANSMISSOES = {"transmissão", "compra e venda", "doação", "partilha/inventário", "permuta", "arrematação", "adjudicação", "usucapião",
                 "integralização/fusão societária"}
 ONUS = {"alienação fiduciária", "hipoteca", "penhora", "arresto/sequestro", "indisponibilidade", "usufruto", "servidão",
         "promessa de compra e venda", "cessão de direitos", "cláusulas restritivas", "ação/averbação premonitória"}
 GARANTIAS = {"alienação fiduciária", "hipoteca"}
 GRAVE = {"penhora", "arresto/sequestro", "indisponibilidade", "ação/averbação premonitória"}
 
-ROT_ADQ = r"(?:ADQUIRENTES?|DONAT[ÁA]RI[OA]S?|COMPRADOR(?:A|ES|AS)?|OUTORGAD[OA]S?(?:\s+COMPRADOR\w*)?|HERDEIR[OA]S?|ARREMATANTES?|ADJUDICAT[ÁA]RI[OA]S?|NOME\s+D[AO]S?\s+ADQUIRENTES?)"
-ROT_TRA = r"(?:TRANSMITENTES?|DOADOR(?:A|ES|AS)?|VENDEDOR(?:A|ES|AS)?|OUTORGANTES?(?:\s+VENDEDOR\w*)?|ESP[ÓO]LIO\s+DE|DE\s+CUJUS|NOME\s+D[AO]S?\s+TRANSMITENTES?)"
+ROT_ADQ = r"(?:ADQUIRENTES?(?:\(S\))?|DONAT[ÁA]RI[OA]S?|COMPRADOR(?:A|ES|AS)?|OUTORGAD[OA]S?(?:\s+COMPRADOR\w*)?|HERDEIR[OA]S?|ARREMATANTES?|ADJUDICAT[ÁA]RI[OA]S?|NOME\s+D[AO]S?\s+ADQUIRENTES?)"
+ROT_TRA = r"(?:TRANSMITENTES?(?:\(S\))?|DOADOR(?:A|ES|AS)?|VENDEDOR(?:A|ES|AS)?|OUTORGANTES?(?:\s+VENDEDOR\w*)?|ESP[ÓO]LIO\s+DE|DE\s+CUJUS|NOME\s+D[AO]S?\s+TRANSMITENTES?)"
 FIM_BLOCO = r"(?=(?i:T[ÍI]TULO|FORMA\s+E\s+DATA|VALOR\s*:|CONDI[ÇC][ÕO]ES|DOCUMENTOS|NOME\s+D[AO]S?\s+INTERVENIENTE|INTERVENIENTE|" + ROT_ADQ + r"|" + ROT_TRA + r")|$)"
 NAO_NOMES = re.compile(r"^(?:RG|CPF|CNPJ|CIC|SSP|RUA|AV|AVENIDA|BRASIL|PARAN[ÁA]|CEP|ITBI|LTDA)\b")
 
@@ -144,6 +144,8 @@ class Analise:
     resumo: list[str]
     documentos_recomendados: list[str]
     contagens: dict = field(default_factory=dict)
+    cotitularidade: bool = False  # vários donos com partes ideais: lista de donos atuais não é deduzida
+    ultimos_adquirentes: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -159,18 +161,24 @@ def _plano(t: str) -> str:
     return re.sub(r"\s+", " ", t or "").strip()
 
 
-def natureza(ato: Ato) -> str:
-    inicio = _plano(ato.texto_original)[:320]
-    achados = []
-    for nome, padrao in NATUREZAS:
-        m = re.search(padrao, inicio, re.I)
-        if m:
-            achados.append((m.start(), nome))
-    if not achados:
-        return "outro"
-    achados.sort()
+def _primeira_natureza(trecho: str) -> str | None:
+    achados = sorted((m.start(), nome) for nome, padrao in NATUREZAS if (m := re.search(padrao, trecho, re.I)))
     # citação de ônus dentro de cancelamento ("cancelada a hipoteca") não muda a natureza
-    return achados[0][1]
+    return achados[0][1] if achados else None
+
+
+def natureza(ato: Ato) -> str:
+    """Título do ato (início do texto); se não houver, o campo "TÍTULO"/"FORMA DO TÍTULO" (ex.: Formal de Partilha)."""
+    texto = _plano(ato.texto_original)
+    nat = _primeira_natureza(texto[:320])
+    if nat:
+        return nat
+    m = re.search(r"T[ÍI]TULO\s*:?-?\s*(.{0,300})", texto, re.I)
+    if m and (nat := _primeira_natureza(m.group(1))):
+        return nat
+    if re.search(ROT_TRA, texto) and re.search(ROT_ADQ, texto):
+        return "transmissão"
+    return "outro"
 
 
 def _nomes(segmento: str) -> list[str]:
@@ -188,17 +196,41 @@ def _nomes(segmento: str) -> list[str]:
             n = m.group(1).strip(" .")
             if 5 <= len(n) <= 90 and not re.search(r"\d", n) and not NAO_NOMES.match(n.upper()):
                 nomes.append(n)
-    return nomes[:6]
+    return nomes[:12]
 
 
 def _pessoas(texto: str, rotulo: str) -> list[str]:
     t = _plano(texto)
     out = []
-    for m in re.finditer(r"(?i:" + rotulo + r")\s*:?-?\s*(.{0,600}?)" + FIM_BLOCO, t):
+    for m in re.finditer(r"(?i:" + rotulo + r")\s*:?-?\s*(.{0,2500}?)" + FIM_BLOCO, t):
         for n in _nomes(m.group(1)):
             if n not in out:
                 out.append(n)
     return out
+
+
+VERBO_TRANSMITE = re.compile(r"\b(?:VENDEM?|DOAM?|TRANSMITEM?|PERMUTAM|CEDEM?)\b|\b(?:vende|vendem|doa|doam|transmite|transmitem)\s+(?:a[oa]s?|para)\b")
+
+
+def _partes(texto: str) -> tuple[list[str], list[str]]:
+    """Quem transmite e quem recebe: pelos rótulos (TRANSMITENTE/ADQUIRENTE) ou, em fichas antigas, pela frase
+    "FULANO, já qualificado, e sua mulher ... VENDEM ao outorgado comprador, BELTRANO, ..."."""
+    de, para = _pessoas(texto, ROT_TRA), _pessoas(texto, ROT_ADQ)
+    t = _plano(texto)
+    v = VERBO_TRANSMITE.search(t)
+    if v and not de:
+        de = _nomes(re.split(r"\d{4}\s*[,;.]|lavrada|Consoante|Conforme", t[max(0, v.start() - 700):v.start()], flags=re.I)[-1])
+    if v and not para:
+        depois = re.split(r"pelo\s+valor|pelo\s+pre[çc]o|\bobjeto\b|parte\s+ideal|\bárea\b", t[v.end():v.end() + 900], flags=re.I)[0]
+        para = _nomes(depois)
+    return de, para
+
+
+def _fracao(texto: str) -> str | None:
+    m = re.search(r"(?:parte|fra[çc][ãa]o)\s+ideal[^.;]{0,140}?(\d[\d.]*(?:,\d+)?\s*(?:%|m2|m²|metros\s+quadrados|alqueires?|hectares?|ha\b))", texto, re.I)
+    if m:
+        return re.sub(r"\s+", " ", m.group(1)).replace("m2", "m²").replace("metros quadrados", "m²")
+    return "parte ideal (tamanho não identificado)" if re.search(r"(?:parte|fra[çc][ãa]o)\s+ideal", texto, re.I) else None
 
 
 def _primeiro(rx: str, texto: str, grupo: int = 1) -> str | None:
@@ -223,10 +255,36 @@ def _refs(texto: str) -> list[str]:
         refs.append(f"R-{int(m.group(1))}")
     for m in re.finditer(r"averba[çc][ãa]o\s+(?:n[º°o.]*\s*)?0*(\d{1,3})\b(?![.,]\d)", texto, re.I):
         refs.append(f"AV-{int(m.group(1))}")
+    # "penhora registrada sob nº 128", "averbada sob o nº 5"
+    for m in re.finditer(r"(registrad|averbad)[ao]s?\s+(?:sob\s+)?(?:o\s+)?(?:n[º°o.]*\s*)0*(\d{1,3})\b(?!\s*/\s*\d|[.,]\d)", texto, re.I):
+        refs.append(f"{'R' if m.group(1).lower().startswith('r') else 'AV'}-{int(m.group(2))}")
     return list(dict.fromkeys(refs))
 
 
 # ---------------------------------------------------------------- explicações
+
+def _mesmo_nome(a: str, b: str) -> bool:
+    """Tolera erro de OCR e sobrenome acrescentado (casamento): MARILENE ZEPONL ≈ MARILENE ZEPONI ALCANTARA ALVES."""
+    from difflib import SequenceMatcher
+    a, b = re.sub(r"[^A-Z ]", "", _sem_acento(a).upper()).split(), re.sub(r"[^A-Z ]", "", _sem_acento(b).upper()).split()
+    if not a or not b:
+        return False
+    curto, longo = (a, b) if len(a) <= len(b) else (b, a)
+    iguais = sum(any(SequenceMatcher(None, x, y).ratio() >= .8 for y in longo) for x in curto)
+    return SequenceMatcher(None, a[0], b[0]).ratio() >= .8 and iguais >= max(2, len(curto) - 1) if len(curto) > 1 else a == b
+
+
+def _aparece(nome: str, texto: str) -> bool:
+    alvo = re.sub(r"\s+", " ", _sem_acento(texto).upper())
+    partes = _sem_acento(nome).upper().split()
+    return len(partes) >= 2 and partes[0] in alvo and partes[-1] in alvo and \
+        re.search(re.escape(partes[0]) + r"[A-Z ]{0,60}" + re.escape(partes[-1]), alvo) is not None
+
+
+def _sem_acento(t: str) -> str:
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", t) if unicodedata.category(c) != "Mn")
+
 
 def _lista(nomes: list[str]) -> str:
     if not nomes:
@@ -246,7 +304,8 @@ def explicar(a: Ato, nat: str, de: list[str], para: list[str], valor: str | None
     s = {
         "compra e venda": f"{quando}, {_lista(de) if de else 'o dono anterior'} {_v(de, 'vendeu', 'venderam')} o imóvel para {_lista(para)}.{v} A partir daí, quem comprou passou a ser dono.",
         "doação": f"{quando}, {_lista(de) if de else 'o dono anterior'} {_v(de, 'deu', 'deram')} o imóvel de presente (doação) para {_lista(para)}. Doar é passar o imóvel para outra pessoa sem ela pagar por ele.",
-        "partilha/inventário": f"{quando}, depois do falecimento ou da separação de quem era dono, o imóvel foi dividido entre {_lista(para)}. Isso se chama partilha.",
+        "transmissão": f"{quando}, o imóvel passou de {_lista(de) if de else 'o dono anterior'} para {_lista(para)}. O tipo de negócio não ficou claro no texto lido.",
+        "partilha/inventário": f"{quando}, depois do falecimento ou da separação de quem era dono, o imóvel passou para {_lista(para)}. Isso se chama partilha.",
         "permuta": f"{quando}, o imóvel foi trocado (permuta). Quem recebeu o imóvel foi {_lista(para)}.",
         "arrematação": f"{quando}, o imóvel foi vendido em leilão da Justiça e quem arrematou foi {_lista(para)}.",
         "adjudicação": f"{quando}, a Justiça passou o imóvel para {_lista(para)} (adjudicação), normalmente para pagar uma dívida.",
@@ -290,8 +349,7 @@ def analisar(ext: Extracao, hoje: date | None = None) -> Analise:
 
     for a in ext.atos:
         nat = natureza(a)
-        de = _pessoas(a.texto_original, ROT_TRA) if nat in TRANSMISSOES | {"promessa de compra e venda"} else []
-        para = _pessoas(a.texto_original, ROT_ADQ) if nat in TRANSMISSOES | {"promessa de compra e venda"} else []
+        de, para = _partes(a.texto_original) if nat in TRANSMISSOES | {"promessa de compra e venda"} else ([], [])
         valor = _valor(a.texto_original)
         texto = _plano(a.texto_original)
         extra = {
@@ -306,14 +364,13 @@ def analisar(ext: Extracao, hoje: date | None = None) -> Analise:
                                    {"de": de, "para": para, "credor": extra["credor"], "devedor": extra["devedor"]}, valor, a.fonte.trecho))
 
         if nat in TRANSMISSOES:
-            frac = _primeiro(r"parte\s+ideal\s+(?:de|correspondente\s+a)\s*(\d+(?:[,.]\d+)?\s*%)", texto) or \
-                _primeiro(r"fra[çc][ãa]o\s+ideal\s+de\s*(\d+(?:[,.]\d+)?\s*%)", texto)
+            frac = _fracao(texto)
             transm.append(Transmissao(a.id, a.data, a.paginas, nat, de, para, frac, valor, exp.simples))
         if nat in ONUS:
             onus.append(Onus(nat, a.id, a.data, a.paginas, extra["credor"], extra["devedor"], valor, extra["processo"], extra["vara"],
                              "ATIVA", None, None, bool(re.search(r"quita[çc][ãa]o|quitad", texto, re.I)), exp.simples))
         if nat == "cancelamento":
-            parcial = "parcial" if re.search(r"cancelamento\s+parcial|parcialmente|em\s+parte|libera[çc][ãa]o\s+parcial", texto, re.I) else "total"
+            parcial = "parcial" if re.search(r"cancelamento\s+parcial|parcialmente|em\s+parte|(?:libera[çc][ãa]o|levantamento)\s+parcial", texto, re.I) else "total"
             cancelamentos.append((a, extra["refs"], parcial))
 
     # vínculo ônus ↔ cancelamento
@@ -350,18 +407,35 @@ def analisar(ext: Extracao, hoje: date | None = None) -> Analise:
         prop_ini = {"nomes": _nomes(m_prop.group(1)), "trecho": m_prop.group(0)[:200]}
     alertas_cadeia = []
     atuais: list[str] = list(prop_ini["nomes"]) if prop_ini else []
+    cotitularidade = any(t.fracao for t in transm) or (prop_ini is not None and len(prop_ini["nomes"]) > 2 and
+                                                         bool(re.search(r"propor[çc]|parte\s+ideal|fra[çc][ãa]o", prop_ini["trecho"] + _plano(ext.abertura)[:3000], re.I)))
+    textos = {a.id: a.texto_original for a in ext.atos}
+    ultimo_ato = None
     for t in transm:
         if not t.para:
             alertas_cadeia.append(f"No ato {t.ato} ({t.natureza}) não foi possível identificar o nome de quem recebeu o imóvel.")
-        if atuais and t.de and not set(map(str.upper, t.de)) & set(map(str.upper, atuais)):
+        anterior = textos.get(ultimo_ato, "")
+        if not cotitularidade and atuais and t.de and not any(_mesmo_nome(a, b) for a in t.de for b in atuais) \
+                and not all(_aparece(a, anterior) for a in t.de):  # cônjuge citado no ato anterior também é titular
             alertas_cadeia.append(f"No ato {t.ato}, quem transmitiu ({_lista(t.de)}) não aparece como dono no ato anterior ({_lista(atuais)}). Pode faltar um ato ou os nomes podem estar escritos de outro jeito.")
         if t.fracao and t.para:
             # parte ideal: quem recebeu entra; quem transmitiu pode ter ficado com outra parte (não se deduz)
             atuais = list(dict.fromkeys(atuais + t.para))
-            alertas_cadeia.append(f"No ato {t.ato}, {_lista(t.de) if t.de else 'o transmitente'} passou {t.fracao} do imóvel para {_lista(t.para)}. "
-                                  "Pelo texto lido não dá para garantir se quem passou ainda tem alguma parte; por isso os dois aparecem como donos.")
         elif t.para:
             atuais = t.para
+        ultimo_ato = t.ato
+    fracionadas = [t.ato for t in transm if t.fracao]
+    if fracionadas:
+        alertas_cadeia.append(
+            f"O imóvel tem (ou teve) mais de um dono, cada um com uma parte (fração ideal). Houve transmissão de partes em "
+            f"{len(fracionadas)} ato(s): {', '.join(fracionadas[:15])}{'…' if len(fracionadas) > 15 else ''}. Pelo texto lido não dá para "
+            "garantir se quem passou a sua parte ficou com alguma outra; por isso a lista de donos atuais precisa ser conferida.")
+    ultimos_adq = [{"ato": t.ato, "data": t.data, "nomes": t.para, "fracao": t.fracao} for t in transm if t.para][-5:]
+    if cotitularidade:
+        atuais = []  # com dezenas de partes ideais e atos ilegíveis, a lista completa não é deduzida
+        if not fracionadas:
+            alertas_cadeia.append("A matrícula começa com vários donos, cada um com uma parte do imóvel (condomínio). "
+                                  "A lista de donos atuais precisa ser conferida no Registro de Imóveis.")
     cadeia_ok = bool(transm) and not alertas_cadeia
     if not transm:
         alertas_cadeia.append("Nenhuma transmissão (venda, doação, partilha etc.) foi identificada no texto lido.")
@@ -397,7 +471,11 @@ def analisar(ext: Extracao, hoje: date | None = None) -> Analise:
     resumo = [
         f"Este é o imóvel da matrícula nº {ext.identificacao['numero_matricula'].valor}" + (f", do {ext.identificacao['cartorio'].valor}" if ext.identificacao["cartorio"].valor else "") + "."
         if ext.identificacao["numero_matricula"].valor else "O número da matrícula não foi identificado no documento.",
-        (f"Pelo documento, hoje o imóvel pertence a {_lista(atuais)} ({transm[-1].ato})." if atuais else "Não foi possível identificar com segurança quem é o dono atual."),
+        (f"Pelo documento, hoje o imóvel pertence a {_lista(atuais)} ({transm[-1].ato})." if atuais else
+         "O imóvel tem vários donos, cada um com uma parte (condomínio). Os mais recentes a receber uma parte foram "
+         f"{_lista(ultimos_adq[-1]['nomes'])} ({ultimos_adq[-1]['ato']}). A lista completa de donos precisa ser conferida." if cotitularidade and ultimos_adq else
+         "O imóvel tem vários donos, cada um com uma parte (condomínio). A lista de donos atuais precisa ser conferida." if cotitularidade else
+         "Não foi possível identificar com segurança quem é o dono atual."),
         f"Encontramos {len(ext.atos)} atos na matrícula: {ext.estatisticas['registros']} registros e {ext.estatisticas['averbacoes']} averbações.",
         (f"Há {len(ativos)} ônus sem cancelamento na matrícula: " + ", ".join(f"{o.tipo} ({o.ato})" for o in ativos) + "." if ativos
          else "Não encontramos ônus ativos na matrícula analisada." if onus else "Não encontramos ônus (dívidas ou impedimentos) registrados no texto lido."),
@@ -421,7 +499,7 @@ def analisar(ext: Extracao, hoje: date | None = None) -> Analise:
     contagens = {"onus": len(onus), "onus_baixados": sum(o.situacao == "BAIXADA/CANCELADA" for o in onus),
                  "onus_ativos": len(ativos), "onus_pendentes": sum(o.situacao.startswith(("PENDENTE", "PARCIAL")) for o in onus)}
     return Analise(atos_a, prop_ini, transm, atuais, cadeia_ok, alertas_cadeia, onus, averb, ultimos, atualidade, riscos,
-                   {"classe": sit[0], "texto": sit[1]}, resumo, docs, contagens)
+                   {"classe": sit[0], "texto": sit[1]}, resumo, docs, contagens, cotitularidade, ultimos_adq)
 
 
 def _antes(ato_onus: str, ato_cancel: str) -> bool:
