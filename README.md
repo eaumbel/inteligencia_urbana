@@ -9,6 +9,12 @@ Municípios iniciais: **Londrina, Cambé, Rolândia e Ibiporã** (PR). Outros en
 
 ![Masterplan](docs/img/2_masterplan.png)
 
+## Marca
+
+Arquivos em `web/assets/`: `logo-alta.png` (original recortado, fundo transparente, para impressão e relatórios),
+`logo.png` (640 px), `logo-quadrado.png` (menu), `favicon.png` e `apple-touch-icon.png`. Sobre fundos escuros, a
+logo é aplicada dentro de um selo branco para preservar o azul original.
+
 ## Analisador de matrícula
 
 Menu próprio (Dashboard, Nova análise, Matrículas analisadas, Histórico registral, Ônus e restrições, Análise de

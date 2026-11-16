@@ -186,3 +186,10 @@ def test_tracado_organico_com_relevo_sintetico(monkeypatch):
     assert m.resumo["relevo"]["declividade_media_pct"] > 5 and m.curvas_nivel
     assert m.resumo["numero_lotes"] > 150
     _sem_sobreposicao(m)
+
+
+def test_logo_e_icones_servidos_inclusive_na_subpasta():
+    c = TestClient(app)
+    for caminho in ("/assets/logo.png", "/assets/logo-quadrado.png", "/assets/favicon.png", "/incorporacao/assets/logo.png"):
+        r = c.get(caminho)
+        assert r.status_code == 200 and r.headers["content-type"] == "image/png"

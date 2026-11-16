@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Inteligência Urbana</title>
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<meta name="theme-color" content="#142D3A">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -60,8 +63,8 @@ a{color:var(--accent)}
 .app{display:grid;grid-template-columns:256px minmax(0,1fr);min-height:100%}
 .side{background:var(--side);color:var(--side-ink);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;padding:22px 14px 16px}
 .brand{display:flex;align-items:center;gap:11px;padding:0 8px 18px}
-.brand-mark{width:40px;height:40px;border-radius:10px;background:var(--gold);display:grid;place-items:center;flex:none}
-.brand-mark svg{width:22px;height:22px;color:#142D3A}
+.brand-mark{width:46px;height:46px;border-radius:10px;background:#FFFFFF;display:grid;place-items:center;flex:none;padding:3px;box-shadow:0 0 0 1px rgba(198,166,107,.55)}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block}
 .brand b{font-family:var(--font-display);font-size:15px;font-weight:600;letter-spacing:-.01em;display:block;color:#fff;white-space:nowrap}
 .brand span{font-size:12px;color:var(--side-muted);white-space:nowrap}
 #abas{display:flex;flex-direction:column;gap:2px}
@@ -221,7 +224,7 @@ body.sem-mapa .col-mapa{display:none}
 <div class="app">
 <aside class="side" aria-label="Menu principal">
   <div class="brand">
-    <div class="brand-mark" aria-hidden="true"><i data-lucide="landmark"></i></div>
+    <div class="brand-mark"><img src="assets/logo-quadrado.png" alt="Inteligência Urbana" width="44" height="44"></div>
     <div><b>Inteligência Urbana</b><span>Incorporação e urbanismo</span></div>
   </div>
   <nav id="abas">
@@ -1556,6 +1559,13 @@ async function gerarImagemApresentacao(m, { largura = 2400, titulo = "Masterplan
   ctx.fillStyle = "#C6A66B"; ctx.fillRect(X, 0, 6, altura);
   ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
   let y = 90;
+  const logo = await carregarImagem("assets/logo.png");
+  if (logo) {
+    const lw = 190, lh = lw * logo.height / logo.width;
+    ctx.fillStyle = "#FFFFFF"; ctx.beginPath(); ctx.roundRect(X + 44, 36, lw + 28, lh + 24, 12); ctx.fill();
+    ctx.drawImage(logo, X + 58, 48, lw, lh);
+    y = 36 + lh + 24 + 64;
+  }
   ctx.fillStyle = "#fff"; ctx.font = "600 40px Inter, Arial, sans-serif"; ctx.fillText(titulo, X + 50, y);
   y += 44; ctx.fillStyle = "#A9BDC7"; ctx.font = "500 24px Inter, Arial, sans-serif";
   (subtitulo || "").split("\n").forEach(l => { ctx.fillText(l, X + 50, y); y += 32; });

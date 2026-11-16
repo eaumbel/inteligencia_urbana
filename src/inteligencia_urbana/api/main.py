@@ -49,7 +49,6 @@ async def remover_prefixo(request, call_next):
         return RedirectResponse(PREFIXO + "/", status_code=308)
     if caminho.startswith(PREFIXO + "/"):
         request.scope["path"] = caminho[len(PREFIXO):]
-        request.scope["root_path"] = request.scope.get("root_path", "") + PREFIXO
     return await call_next(request)
 
 
@@ -316,6 +315,11 @@ def api_masterplan(p: ParametrosMasterplan):
 
 
 # ------------------------------------------------------------------ interface web
+
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+
+app.mount("/assets", StaticFiles(directory=WEB / "assets"), name="assets")
+
 
 @app.get("/", include_in_schema=False)
 def index():
