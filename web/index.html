@@ -167,6 +167,47 @@ ul{padding-left:20px;margin:6px 0} li{margin:3px 0}
 }
 @media (max-width:560px){ .grade{grid-template-columns:1fr} #mapa{height:340px} }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ---------- Analisador de matrícula ---------- */
+#abas{overflow-y:auto;min-height:0}
+body.sem-mapa .trabalho{grid-template-columns:minmax(0,1fr)}
+body.sem-mapa .col-mapa{display:none}
+.az-drop{display:block;margin-top:14px;border:1.5px dashed var(--line-strong);border-radius:12px;padding:28px;text-align:center;cursor:pointer;font-weight:400;color:var(--ink);transition:border-color .15s,background .15s}
+.az-drop:hover,.az-drop.sobre{border-color:var(--accent);background:var(--accent-soft)}
+.az-drop b{color:var(--accent)}
+.az-passos{margin:0;padding-left:0;list-style:none;display:grid;gap:6px}
+.az-passos li{display:flex;gap:10px;align-items:center;font-size:14px;color:var(--muted)}
+.az-passos li::before{content:"";width:12px;height:12px;border-radius:50%;border:2px solid var(--line-strong);flex:none}
+.az-passos li.atual{color:var(--ink);font-weight:700}
+.az-passos li.atual::before{border-color:var(--accent);background:var(--accent-soft)}
+.az-passos li.feito{color:var(--ink)}
+.az-passos li.feito::before{border-color:var(--ok);background:var(--ok)}
+.az-passos li small{margin-left:auto;color:var(--muted);font-weight:500}
+.az-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.az-ind{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.az-ind small{display:block;font-size:11.5px;color:var(--muted);font-weight:700}
+.az-ind b{display:block;font-family:var(--font-display);font-size:16px;margin-top:2px;overflow-wrap:anywhere}
+.az-ind .nao{font-family:var(--font-body);font-size:12.5px;font-weight:600;color:var(--muted)}
+.az-ref{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;color:var(--info);background:var(--info-soft);border:0;border-radius:999px;padding:1px 8px;cursor:pointer;margin-left:4px;white-space:nowrap}
+.az-ref:hover{filter:brightness(.95)}
+.az-sit{display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface-2);font-weight:700}
+.az-niv{display:inline-block;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.az-niv.CRITICO{background:#7f1d1d;color:#fff}.az-niv.ALTO{background:var(--bad-soft);color:var(--bad)}
+.az-niv.MODERADO{background:var(--warn-soft);color:var(--warn)}.az-niv.INFORMATIVO{background:var(--info-soft);color:var(--info)}
+.az-lado{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+@media (max-width:1000px){.az-lado{grid-template-columns:1fr}}
+.az-pag-img{width:100%;border:1px solid var(--line);border-radius:10px;background:#fff}
+.az-texto{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.5;max-height:70vh;overflow:auto;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px}
+.az-texto mark{background:#ffe08a;color:#1f2a24;border-radius:3px}
+.az-tl{position:relative;margin:6px 0 0;padding-left:22px}
+.az-tl::before{content:"";position:absolute;left:7px;top:4px;bottom:4px;width:2px;background:var(--line-strong)}
+.az-tl-item{position:relative;padding:0 0 14px}
+.az-tl-item::before{content:"";position:absolute;left:-20px;top:5px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:3px solid var(--steel)}
+.az-tl-item.R::before{border-color:var(--accent)}
+.az-tl-item b{font-family:var(--font-display)}
+.az-tl-item .muted{display:block}
+.az-modal{position:fixed;inset:0;background:rgba(8,15,20,.55);z-index:2000;display:flex;align-items:flex-start;justify-content:center;padding:4vh 16px;overflow-y:auto}
+.az-modal>div{background:var(--surface);border-radius:16px;width:min(1200px,100%);padding:20px;box-shadow:var(--shadow-lg)}
 </style>
 </head>
 <body>
@@ -177,6 +218,15 @@ ul{padding-left:20px;margin:6px 0} li{margin:3px 0}
     <div><b>Inteligência Urbana</b><span>Incorporação e urbanismo</span></div>
   </div>
   <nav id="abas">
+    <div class="nav-label">Analisador de matrícula</div>
+    <button data-aba="az-dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>Dashboard</button>
+    <button data-aba="az-nova"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Nova análise</button>
+    <button data-aba="az-lista"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>Matrículas analisadas</button>
+    <button data-aba="az-historico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Histórico registral</button>
+    <button data-aba="az-onus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Ônus e restrições</button>
+    <button data-aba="az-riscos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 21h20z"/><path d="M12 10v5M12 18h.01"/></svg>Análise de riscos</button>
+    <button data-aba="az-relatorios"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M9 15l2 2 4-4"/></svg>Relatórios</button>
+    <button data-aba="az-config"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Configurações</button>
     <div class="nav-label">Estudo guiado</div>
     <button data-aba="estudo" class="ativo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg>Novo estudo</button>
     <div class="nav-label">Documentos</div>
@@ -202,6 +252,36 @@ ul{padding-left:20px;margin:6px 0} li{margin:3px 0}
   </header>
 <main class="trabalho">
 <section class="col-form">
+  <!-- ANALISADOR DE MATRÍCULA -->
+  <div class="painel" id="p-az-dashboard"><div id="az-dash"></div></div>
+  <div class="painel" id="p-az-nova">
+    <div class="card">
+      <h2>Nova análise de matrícula</h2>
+      <p class="muted" style="margin:0">Envie a certidão de inteiro teor em PDF (com texto ou digitalizada) ou as páginas em JPG/PNG.
+        A leitura e o OCR acontecem no seu navegador; o servidor recebe só o texto extraído.</p>
+      <label class="az-drop" id="az-drop">
+        <input type="file" id="az-arq" accept=".pdf,.jpg,.jpeg,.png" multiple hidden>
+        <b>Clique para escolher</b> ou arraste os arquivos aqui<br><span class="muted">PDF (várias páginas) ou imagens JPG/PNG — uma imagem por página, na ordem do nome</span>
+      </label>
+      <div id="az-arqs" class="muted"></div>
+      <button class="btn" id="az-ir" disabled>Iniciar análise</button>
+    </div>
+    <div class="card" id="az-prog-card" hidden><h2>Progresso</h2><ol class="az-passos" id="az-passos"></ol></div>
+  </div>
+  <div class="painel" id="p-az-lista"><div class="card"><h2>Matrículas analisadas</h2>
+    <p class="muted">Salvas somente neste navegador (até a ativação do banco de dados com login).</p><div id="az-lista"></div></div></div>
+  <div class="painel" id="p-az-historico"><div id="az-hist"></div></div>
+  <div class="painel" id="p-az-onus"><div id="az-onus"></div></div>
+  <div class="painel" id="p-az-riscos"><div id="az-riscos"></div></div>
+  <div class="painel" id="p-az-relatorios"><div id="az-rel"></div></div>
+  <div class="painel" id="p-az-config"><div class="card"><h2>Configurações</h2>
+    <table>
+      <tr><th>Armazenamento</th><td>Neste navegador (IndexedDB). Os documentos não são enviados a servidores de terceiros; o servidor do app recebe apenas o texto para análise e não o guarda.</td></tr>
+      <tr><th>OCR</th><td>Tesseract.js (português), executado no navegador. Páginas com confiança abaixo de 70% são sinalizadas.</td></tr>
+      <tr><th>Regra de confiabilidade</th><td>Nenhuma informação é presumida: o que não está no documento aparece como "Não identificado no documento analisado."</td></tr>
+    </table>
+    <button class="btn sec" id="az-limpar">Apagar todas as análises deste navegador</button></div></div>
+
   <!-- NOVO ESTUDO (passo a passo) -->
   <div class="painel ativo" id="p-estudo">
     <div class="card etapa" id="wz-1">
@@ -340,6 +420,10 @@ const estado = { matricula: null, masterplan: null, schemas: null };
 
 // ---------- abas
 const SUBTITULOS = {
+  "az-dashboard": "Painel da matrícula analisada", "az-nova": "Envie a matrícula: o sistema lê, separa os atos e organiza a história do imóvel",
+  "az-lista": "Análises salvas neste navegador", "az-historico": "Todos os registros e averbações em ordem cronológica",
+  "az-onus": "Existe alguma dívida ou impedimento relacionado ao imóvel?", "az-riscos": "Pontos de atenção encontrados no documento",
+  "az-relatorios": "Relatório técnico da análise", "az-config": "Armazenamento, OCR e regras de confiabilidade",
   estudo: "Passo a passo: matrícula → consulta do IPPUL → masterplan",
   matricula: "Certidão de inteiro teor: atos, ônus, memorial descritivo e confrontações",
   diretrizes: "Consulta prévia e diretrizes de parcelamento do solo",
@@ -354,6 +438,8 @@ document.querySelectorAll("#abas button").forEach(b => b.onclick = () => {
   document.querySelectorAll(".painel").forEach(p => p.classList.toggle("ativo", p.id === "p-" + b.dataset.aba));
   $("#titulo").textContent = b.textContent.trim();
   $("#subtitulo").textContent = SUBTITULOS[b.dataset.aba] || "";
+  document.body.classList.toggle("sem-mapa", b.dataset.aba.startsWith("az-"));
+  if (b.dataset.aba.startsWith("az-") && typeof azAoAbrir === "function") azAoAbrir(b.dataset.aba);
   document.body.classList.remove("nav-aberta");
   setTimeout(() => mapa.invalidateSize(), 50);
 });
@@ -578,11 +664,12 @@ function carregarScript(src) {
   });
 }
 async function workerOCR(aviso) {
+  workerOCR.aviso = aviso;
   if (!tessPromessa) tessPromessa = (async () => {
     await carregarScript(TESS.script);
     aviso("Preparando o reconhecimento de texto (OCR)… na primeira vez pode levar alguns segundos.");
     const w = await Tesseract.createWorker("por", 1, { workerPath: TESS.workerPath, corePath: TESS.corePath, langPath: TESS.langPath,
-      logger: m => { if (m.status === "recognizing text" && workerOCR.pagina) aviso(`Reconhecendo texto (OCR) — página ${workerOCR.pagina}: ${Math.round(m.progress * 100)}%`); } });
+      logger: m => { if (m.status === "recognizing text" && workerOCR.pagina) workerOCR.aviso(`Reconhecendo texto (OCR) — página ${workerOCR.pagina}: ${Math.round(m.progress * 100)}%`); } });
     await w.setParameters({ tessedit_pageseg_mode: "4" });
     return w;
   })().catch(e => { tessPromessa = null; throw e; });
@@ -1597,6 +1684,258 @@ async function wzGerarMasterplan() {
     $("#wz-mp-param").onclick = () => document.querySelector('[data-aba="masterplan"]').click();
     wzStatus(3, "Concluída", true);
   } catch (e) { wzStatus(3, "Erro"); erro("#wz-mp-res", e); }
+}
+
+// ---------- ANALISADOR DE MATRÍCULA (Fases 1–3: envio, leitura integral rastreável, registros e averbações)
+const AZ_NI = "Não identificado no documento analisado.";
+const az = { atual: null, arquivos: [] };
+const AZ_PASSOS = ["Leitura do documento", "Identificação do número da matrícula", "Identificação do cartório e comarca",
+  "Identificação da data de emissão", "Extração integral do conteúdo", "Separação dos registros (R) e averbações (AV)",
+  "Organização cronológica dos atos", "Análise individual de cada ato", "Cruzamento das informações", "Geração do relatório"];
+const AZ_PROXIMAS = { 7: "Fases 4–5", 8: "Fase 7", 9: "Fase 10" };  // índices de AZ_PASSOS ainda em desenvolvimento
+const dataBR = iso => iso ? iso.split("-").reverse().join("/") : null;
+
+// armazenamento local (IndexedDB) — cada navegador guarda só as próprias análises
+const azDB = (() => { let p; return () => p ||= new Promise((ok, falha) => {
+  const r = indexedDB.open("iu-analisador", 1);
+  r.onupgradeneeded = () => r.result.createObjectStore("analises", { keyPath: "id" });
+  r.onsuccess = () => ok(r.result); r.onerror = () => falha(r.error);
+}); })();
+async function azTx(modo, fn) {
+  const db = await azDB();
+  return new Promise((ok, falha) => { const tx = db.transaction("analises", modo); const r = fn(tx.objectStore("analises")); tx.oncomplete = () => ok(r?.result); tx.onerror = () => falha(tx.error); });
+}
+const azSalvar = a => azTx("readwrite", st => st.put(a)).catch(() => {});
+const azListar = () => azTx("readonly", st => st.getAll()).catch(() => []);
+const azApagar = id => azTx("readwrite", st => st.delete(id));
+
+// ---- envio
+function azEscolher(files) {
+  // PDFs primeiro; depois as imagens, cada uma uma página, em ordem de nome
+  const nome = (a, b) => a.name.localeCompare(b.name, "pt-BR", { numeric: true });
+  const lista = [...files].filter(f => /\.(pdf|jpe?g|png)$/i.test(f.name));
+  az.arquivos = [...lista.filter(f => /\.pdf$/i.test(f.name)).sort(nome), ...lista.filter(f => !/\.pdf$/i.test(f.name)).sort(nome)];
+  $("#az-arqs").innerHTML = az.arquivos.length ? `<p style="margin:10px 0 0">${az.arquivos.map(f => `${esc(f.name)} <span class="muted">(${fmt(f.size / 1024, 0)} KB)</span>`).join("<br>")}</p>` : "";
+  $("#az-ir").disabled = !az.arquivos.length;
+}
+$("#az-arq").onchange = e => azEscolher(e.target.files);
+const zona = $("#az-drop");
+["dragenter", "dragover"].forEach(ev => zona.addEventListener(ev, e => { e.preventDefault(); zona.classList.add("sobre"); }));
+["dragleave", "drop"].forEach(ev => zona.addEventListener(ev, e => { e.preventDefault(); zona.classList.remove("sobre"); }));
+zona.addEventListener("drop", e => azEscolher(e.dataTransfer.files));
+
+function azPassos(atual, detalhe = "") {
+  $("#az-passos").innerHTML = AZ_PASSOS.map((p, i) => `<li class="${i < atual ? "feito" : i === atual ? "atual" : ""}">${p}${
+    i === atual && detalhe ? `<small>${esc(detalhe)}</small>` : AZ_PROXIMAS[i] && i > atual ? `<small>${AZ_PROXIMAS[i]}</small>` : ""}</li>`).join("");
+}
+async function azMiniatura(fonte, largura = 1100) {
+  const c = document.createElement("canvas"), k = largura / fonte.width;
+  c.width = largura; c.height = Math.round(fonte.height * k);
+  c.getContext("2d").drawImage(fonte, 0, 0, c.width, c.height);
+  return c.toDataURL("image/jpeg", .72);
+}
+async function azOCR(canvas, rotulo, aviso) {
+  const w = await workerOCR(aviso); workerOCR.pagina = rotulo;
+  const { data } = await w.recognize(canvas);
+  return { texto: data.text, confianca: Math.round(data.confidence) };
+}
+// lê cada página: texto do PDF quando existe; senão OCR com confiança; guarda uma imagem para conferência
+async function azLerPaginas(arquivos, aviso) {
+  const paginas = [];
+  for (const arq of arquivos) {
+    if (/\.pdf$/i.test(arq.name)) {
+      const lib = await carregarPdfJs();
+      const pdf = await lib.getDocument({ data: await arq.arrayBuffer() }).promise;
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const n = paginas.length + 1;
+        aviso(`página ${n} (${arq.name}, ${i}/${pdf.numPages})`);
+        const pg = await pdf.getPage(i);
+        const c = await pg.getTextContent();
+        let texto = c.items.map(it => it.str + (it.hasEOL ? "\n" : " ")).join(""), metodo = "texto", confianca = null;
+        const vp = pg.getViewport({ scale: 3 }), canvas = document.createElement("canvas");
+        canvas.width = vp.width; canvas.height = vp.height;
+        await pg.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
+        if (conteudoUtil(texto) < 50) {  // página escaneada (ou só com carimbo digital): OCR
+          const r = await azOCR(canvas, `${n}`, aviso);
+          texto = r.texto; confianca = r.confianca; metodo = "ocr";
+        }
+        paginas.push({ numero: n, texto, metodo, confianca, imagem: await azMiniatura(canvas) });
+        canvas.width = canvas.height = 0;
+      }
+    } else {
+      const n = paginas.length + 1;
+      aviso(`página ${n} (${arq.name}) — OCR`);
+      const img = await new Promise((ok, falha) => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => falha(new Error(`Imagem ilegível: ${arq.name}`)); im.src = URL.createObjectURL(arq); });
+      const canvas = document.createElement("canvas"); canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+      canvas.getContext("2d").drawImage(img, 0, 0);
+      const { texto, confianca } = await azOCR(canvas, `${n}`, aviso);
+      paginas.push({ numero: n, texto, metodo: "ocr", confianca, imagem: await azMiniatura(canvas) });
+    }
+  }
+  return paginas;
+}
+$("#az-ir").onclick = async () => {
+  $("#az-prog-card").hidden = false; $("#az-ir").disabled = true;
+  try {
+    azPassos(0, "carregando…");
+    const paginas = await azLerPaginas(az.arquivos, t => azPassos(0, t));
+    azPassos(4, `${paginas.length} página(s)`);
+    const ext = await postJSON("api/analisador/extrair", { arquivo: az.arquivos.map(f => f.name).join(", "),
+      paginas: paginas.map(({ numero, texto, metodo, confianca }) => ({ numero, texto, metodo, confianca })) });
+    azPassos(7);
+    const a = { id: Date.now(), criado_em: new Date().toISOString(), arquivo: az.arquivos.map(f => f.name).join(", "), paginas, extracao: ext, correcoes: [] };
+    await azSalvar(a);
+    az.atual = a;
+    document.querySelector('[data-aba="az-dashboard"]').click();
+  } catch (e) { $("#az-passos").insertAdjacentHTML("afterend", `<div class="alerta">${esc(e.message || e)}</div>`); }
+  finally { $("#az-ir").disabled = !az.arquivos.length; }
+};
+
+// ---- componentes de exibição
+const azRef = (fonte, rotulo) => fonte && fonte.pagina ? `<button class="az-ref" data-pag="${fonte.pagina}" data-trecho="${esc(fonte.trecho || "")}" title="Ver o trecho original">${rotulo || "pág. " + fonte.pagina}</button>` : "";
+function azInd(rotulo, campo, formato = v => esc(v), proxima = null) {
+  const v = campo?.valor;
+  const corpo = v != null && v !== "" ? `<b>${formato(v)}</b>${azRef(campo.fonte)}` : proxima ? `<b class="nao">Disponível na ${proxima}</b>` : `<b class="nao">${AZ_NI}</b>`;
+  return `<div class="az-ind"><small>${rotulo}</small>${corpo}</div>`;
+}
+function azLigarRefs(raiz = document) {
+  raiz.querySelectorAll(".az-ref").forEach(b => b.onclick = () => azVer(+b.dataset.pag, b.dataset.trecho));
+}
+function azSemAnalise(alvo) {
+  $(alvo).innerHTML = `<div class="card"><h2>Nenhuma análise aberta</h2><p class="muted">Faça uma <b>Nova análise</b> ou abra uma das <b>Matrículas analisadas</b>.</p>
+    <button class="btn" onclick="document.querySelector('[data-aba=az-nova]').click()">Nova análise</button></div>`;
+}
+const azAtos = () => az.atual.extracao.atos;
+function azAtoLinha(a) {
+  const data = a.data ? `${dataBR(a.data)}${a.data_origem && a.data_origem !== "texto do ato" ? ` <span class="muted">(${esc(a.data_origem)})</span>` : ""}` : `<span class="muted">${AZ_NI}</span>`;
+  const conf = a.confianca != null ? ` <span class="muted">· OCR ${a.confianca}%</span>` : "";
+  return `<tr><td style="white-space:nowrap"><b>${a.id}</b><div class="muted">${a.tipo === "R" ? "Registro" : "Averbação"}</div></td><td>${data}</td>
+    <td>${a.categorias.map(c => `<span class="tag">${esc(c)}</span>`).join("")}</td>
+    <td style="white-space:nowrap">${a.paginas.map(p => azRef({ pagina: p, trecho: a.fonte.trecho }, "pág. " + p)).join("")}${conf}</td></tr>`;
+}
+
+// ---- dashboard
+function azDashboard() {
+  const a = az.atual; if (!a) return azSemAnalise("#az-dash");
+  const e = a.extracao, i = e.identificacao, s = e.estatisticas, q = e.sequencia;
+  const ultimoR = e.atos.filter(x => x.tipo === "R" && x.data).sort((x, y) => x.data.localeCompare(y.data)).pop();
+  const ultimos = [...e.atos].sort((x, y) => y.numero - x.numero).slice(0, 5);
+  $("#az-dash").innerHTML = `
+    <div class="card"><h2>${esc(i.numero_matricula.valor ? "Matrícula " + i.numero_matricula.valor : "Matrícula sem número identificado")}</h2>
+      <p class="muted" style="margin:0">${esc(a.arquivo)} · analisada em ${new Date(a.criado_em).toLocaleString("pt-BR")} · ${s.paginas} página(s)${s.paginas_ocr ? `, ${s.paginas_ocr} por OCR (confiança média ${fmt(s.confianca_media_ocr, 0)}%)` : ""}</p>
+      <div class="az-sit" style="margin-top:12px"><span class="az-niv INFORMATIVO">EM ANÁLISE</span>
+        <span>Análise inconclusiva por enquanto: a cadeia de proprietários (Fase 4) e a situação dos ônus (Fase 5) ainda não são avaliadas. A ausência de ônus nesta tela não significa matrícula regular.</span></div>
+      <button class="btn sec" id="az-ver-doc">Ver documento e texto extraído</button></div>
+    <div class="card"><h2>Identificação</h2><div class="az-grid">
+      ${azInd("Número da matrícula", i.numero_matricula)}${azInd("Cartório de registro", i.cartorio)}${azInd("Comarca", i.comarca)}
+      ${azInd("Município / UF", { valor: [i.municipio.valor, i.uf.valor].filter(Boolean).join(" / ") || null, fonte: i.municipio.fonte })}
+      ${azInd("Área total registrada", null, null, "Fase 6")}${azInd("Tipo de imóvel", null, null, "Fase 6")}
+      ${azInd("Proprietário atual", null, null, "Fase 4")}${azInd("Abertura da matrícula", i.data_abertura, dataBR)}
+      ${azInd("Data do último registro", { valor: ultimoR?.data || null, fonte: ultimoR && { ...ultimoR.fonte, pagina: ultimoR.paginas[0] } }, v => `${dataBR(v)} <span class="muted" style="font-size:12px">(${ultimoR.id})</span>`)}${azInd("Emissão da certidão", i.data_emissao, dataBR)}
+    </div></div>
+    <div class="card"><h2>Atos</h2><div class="az-grid">
+      <div class="az-ind"><small>Registros (R)</small><b>${s.registros}</b></div><div class="az-ind"><small>Averbações (AV)</small><b>${s.averbacoes}</b></div>
+      <div class="az-ind"><small>Último ato lido / certificado</small><b>${q.ultimo_ato_lido ?? "—"} / ${q.ultimo_ato_certificado ?? "—"}</b></div>
+      <div class="az-ind"><small>Atos não localizados</small><b>${q.faltantes.length ? q.faltantes.join(", ") : "nenhum"}</b></div>
+      ${azInd("Ônus identificados", null, null, "Fase 5")}${azInd("Ônus baixados", null, null, "Fase 5")}${azInd("Restrições aparentemente ativas", null, null, "Fase 5")}
+    </div><p class="muted" style="margin:8px 0 0">Numeração ${esc(q.numeracao)}.</p></div>
+    <div class="card"><h2>O que aconteceu por último com este imóvel?</h2>
+      <table><tr><th>Ato</th><th>Data</th><th>Natureza (preliminar)</th><th>Onde</th></tr>${ultimos.map(azAtoLinha).join("") || `<tr><td colspan="4">${AZ_NI}</td></tr>`}</table></div>
+    ${e.alertas.length ? `<div class="card"><h2>Pontos de atenção da leitura</h2>${azAlertasHTML(e.alertas)}</div>` : ""}`;
+  $("#az-ver-doc").onclick = () => azVer(1);
+  azLigarRefs($("#az-dash"));
+}
+const azAlertasHTML = l => `<table>${l.map(x => `<tr><td style="width:110px"><span class="az-niv ${x.nivel}">${x.nivel}</span></td><td>${esc(x.texto)}<div class="muted">Onde: ${esc(x.onde)}</div></td></tr>`).join("")}</table>`;
+
+// ---- histórico registral (linha do tempo de todos os atos)
+function azHistorico() {
+  const a = az.atual; if (!a) return azSemAnalise("#az-hist");
+  const atos = azAtos();
+  $("#az-hist").innerHTML = `<div class="card"><h2>Linha do tempo dos atos (${atos.length})</h2>
+    <p class="muted" style="margin:0 0 10px">Ordem dos atos na matrícula. A explicação de cada ato e a cadeia de proprietários chegam nas Fases 4 e 8.</p>
+    <div class="az-tl">${atos.map(x => `<div class="az-tl-item ${x.tipo}"><b>${x.id}</b> — ${x.tipo === "R" ? "Registro" : "Averbação"}
+      ${x.data ? `· ${dataBR(x.data)}${x.data_origem !== "texto do ato" ? ` (${esc(x.data_origem)})` : ""}` : `· <span class="muted" style="display:inline">${AZ_NI}</span>`}
+      ${x.paginas.map(p => azRef({ pagina: p, trecho: x.fonte.trecho }, "pág. " + p)).join("")}
+      <div>${x.categorias.map(c => `<span class="tag">${esc(c)}</span>`).join("")}</div>
+      <details><summary>Texto original</summary><div class="az-texto">${esc(x.texto_original)}</div></details></div>`).join("") || AZ_NI}</div></div>`;
+  azLigarRefs($("#az-hist"));
+}
+
+// ---- ônus (lista preliminar; a situação de cada um depende da Fase 5)
+const AZ_ONUS = ["hipoteca", "alienação fiduciária", "penhora", "arresto/sequestro", "indisponibilidade", "usufruto", "servidão",
+  "cláusulas restritivas", "averbação premonitória/ação", "compromisso de compra e venda", "tombamento", "enfiteuse/aforamento"];
+function azOnus() {
+  const a = az.atual; if (!a) return azSemAnalise("#az-onus");
+  const cancel = azAtos().filter(x => x.categorias.includes("cancelamento"));
+  const lista = azAtos().filter(x => !x.categorias.includes("cancelamento") && x.categorias.some(c => AZ_ONUS.includes(c)));
+  $("#az-onus").innerHTML = `<div class="card"><h2>Ocorrências com termos de ônus ou restrição</h2>
+    <div class="alerta" style="border-left-color:var(--info);background:var(--info-soft)">Lista preliminar: atos cujo texto menciona um tipo de ônus. A situação individual (ativa, baixada, parcialmente cancelada, histórica) será determinada na Fase 5, vinculando cada constituição ao respectivo ato de cancelamento. Até lá, todas aparecem como <b>PENDENTE DE CONFIRMAÇÃO</b>.</div>
+    <table><tr><th>Ato</th><th>Tipo mencionado</th><th>Situação</th><th>Onde</th></tr>
+    ${lista.map(x => `<tr><td><b>${x.id}</b><div class="muted">${x.data ? dataBR(x.data) : AZ_NI}</div></td><td>${x.categorias.filter(c => AZ_ONUS.includes(c)).map(c => `<span class="tag onus">${esc(c)}</span>`).join("")}</td>
+      <td><span class="az-niv MODERADO">PENDENTE DE CONFIRMAÇÃO</span></td><td>${x.paginas.map(p => azRef({ pagina: p, trecho: x.fonte.trecho }, "pág. " + p)).join("")}</td></tr>`).join("")
+      || `<tr><td colspan="4">Nenhum ato com termos de ônus foi encontrado no texto lido. Isso não comprova a inexistência de ônus.</td></tr>`}</table></div>
+    <div class="card"><h2>Atos de cancelamento encontrados</h2>
+    <p class="muted" style="margin:0 0 8px">Possíveis baixas. Qual ônus cada um cancela, e se o cancelamento é total ou parcial, será verificado na Fase 5.</p>
+    <table>${cancel.map(x => `<tr><td><b>${x.id}</b><div class="muted">${x.data ? dataBR(x.data) : AZ_NI}</div></td><td>${esc(x.texto_original.slice(0, 220))}…</td>
+      <td>${x.paginas.map(p => azRef({ pagina: p, trecho: x.fonte.trecho }, "pág. " + p)).join("")}</td></tr>`).join("") || `<tr><td>Nenhum ato de cancelamento encontrado no texto lido.</td></tr>`}</table></div>`;
+  azLigarRefs($("#az-onus"));
+}
+function azRiscos() {
+  const a = az.atual; if (!a) return azSemAnalise("#az-riscos");
+  $("#az-riscos").innerHTML = `<div class="card"><h2>Pontos de atenção identificados até agora</h2>
+    <p class="muted">Nesta fase, os alertas tratam da leitura do documento (legibilidade, sequência de atos, datas, emissão). O motor de riscos jurídicos chega na Fase 7.</p>
+    ${a.extracao.alertas.length ? azAlertasHTML(a.extracao.alertas) : "<p>Nenhum ponto de atenção de leitura.</p>"}</div>`;
+}
+function azRelatorios() {
+  const a = az.atual; if (!a) return azSemAnalise("#az-rel");
+  $("#az-rel").innerHTML = `<div class="card"><h2>Relatório técnico</h2>
+    <p class="muted">O relatório técnico em PDF chega na Fase 10. Já é possível baixar os dados extraídos, com página, ato e trecho original de cada informação.</p>
+    <button class="btn" id="az-json">Baixar dados extraídos (JSON)</button></div>`;
+  $("#az-json").onclick = () => { const { paginas, ...resto } = a;
+    baixar(new Blob([JSON.stringify({ ...resto, paginas: paginas.map(({ imagem, ...p }) => p) }, null, 2)], { type: "application/json" }), `matricula_${a.extracao.identificacao.numero_matricula.valor || a.id}.json`); };
+}
+async function azLista() {
+  const itens = (await azListar()).sort((x, y) => y.id - x.id);
+  $("#az-lista").innerHTML = itens.length ? `<table><tr><th>Matrícula</th><th>Arquivo</th><th>Analisada em</th><th>Atos</th><th></th></tr>
+    ${itens.map(x => `<tr><td><b>${esc(x.extracao.identificacao.numero_matricula.valor || "—")}</b><div class="muted">${esc(x.extracao.identificacao.cartorio.valor || "")}</div></td>
+      <td>${esc(x.arquivo)}</td><td>${new Date(x.criado_em).toLocaleString("pt-BR")}</td><td>${x.extracao.atos.length}</td>
+      <td style="white-space:nowrap"><button class="btn sec" data-abrir="${x.id}" style="margin:0 4px 0 0">Abrir</button><button class="btn sec" data-apagar="${x.id}" style="margin:0">Apagar</button></td></tr>`).join("")}</table>`
+    : `<p>Nenhuma análise salva neste navegador.</p>`;
+  document.querySelectorAll("[data-abrir]").forEach(b => b.onclick = () => { az.atual = itens.find(x => x.id === +b.dataset.abrir); document.querySelector('[data-aba="az-dashboard"]').click(); });
+  document.querySelectorAll("[data-apagar]").forEach(b => b.onclick = async () => { if (!confirm("Apagar esta análise deste navegador?")) return;
+    await azApagar(+b.dataset.apagar); if (az.atual?.id === +b.dataset.apagar) az.atual = null; azLista(); });
+}
+$("#az-limpar").onclick = async () => { if (!confirm("Apagar todas as análises salvas neste navegador?")) return;
+  for (const x of await azListar()) await azApagar(x.id); az.atual = null; alert("Análises apagadas."); };
+function azAoAbrir(aba) {
+  ({ "az-dashboard": azDashboard, "az-historico": azHistorico, "az-onus": azOnus, "az-riscos": azRiscos, "az-relatorios": azRelatorios, "az-lista": azLista })[aba]?.();
+}
+
+// ---- visualização lado a lado: documento original × texto extraído, com o trecho destacado
+function azVer(pagina = 1, trecho = "") {
+  const a = az.atual; if (!a) return;
+  const total = a.paginas.length; pagina = Math.min(Math.max(pagina, 1), total);
+  const p = a.paginas[pagina - 1];
+  let texto = esc(p.texto);
+  const alvo = (trecho || "").replace(/\s+/g, " ").trim().slice(0, 45);
+  if (alvo) {  // destaca o trecho tolerando quebras de linha e espaços
+    const rx = new RegExp(esc(alvo).split(" ").map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+"), "i");
+    texto = texto.replace(rx, m => `<mark id="az-mark">${m}</mark>`);
+  }
+  document.querySelector(".az-modal")?.remove();
+  document.body.insertAdjacentHTML("beforeend", `<div class="az-modal"><div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><h2 style="margin:0;flex:1">Página ${pagina} de ${total}</h2>
+      <span class="muted">${p.metodo === "ocr" ? `lida por OCR — confiança ${p.confianca ?? "?"}%` : "texto do próprio PDF"}</span>
+      <button class="btn sec" data-ir="${pagina - 1}" ${pagina === 1 ? "disabled" : ""} style="margin:0">‹ Anterior</button>
+      <button class="btn sec" data-ir="${pagina + 1}" ${pagina === total ? "disabled" : ""} style="margin:0">Próxima ›</button>
+      <button class="btn" data-fechar style="margin:0">Fechar</button></div>
+    <div class="az-lado" style="margin-top:14px"><div>${p.imagem ? `<img class="az-pag-img" src="${p.imagem}" alt="Página ${pagina} do documento original">` : `<p class="muted">Imagem da página indisponível.</p>`}</div>
+      <div><div class="az-texto">${texto || `<span class="muted">${AZ_NI}</span>`}</div></div></div></div></div>`);
+  const m = document.querySelector(".az-modal");
+  m.querySelectorAll("[data-ir]").forEach(b => b.onclick = () => azVer(+b.dataset.ir));
+  m.querySelector("[data-fechar]").onclick = () => m.remove();
+  m.onclick = e => { if (e.target === m) m.remove(); };
+  document.getElementById("az-mark")?.scrollIntoView({ block: "center" });
 }
 
 // ---------- REURB

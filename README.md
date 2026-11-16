@@ -9,6 +9,14 @@ Municípios iniciais: **Londrina, Cambé, Rolândia e Ibiporã** (PR). Outros en
 
 ![Masterplan](docs/img/2_masterplan.png)
 
+## Analisador de matrícula
+
+Menu próprio (Dashboard, Nova análise, Matrículas analisadas, Histórico registral, Ônus e restrições, Análise de
+riscos, Relatórios, Configurações). Recebe PDF (com texto ou digitalizado) ou imagens JPG/PNG, lê cada página
+(texto do PDF ou OCR com confiança), separa registros e averbações e mostra cada informação com página, ato e trecho
+original, lado a lado com o documento. Arquitetura, regras de confiabilidade e fases em
+[docs/ANALISADOR.md](docs/ANALISADOR.md).
+
 ## Passo a passo (aba "Novo estudo")
 
 1. **Matrícula** (obrigatória): o PDF é lido (com OCR se for escaneado), analisado e o imóvel é localizado e

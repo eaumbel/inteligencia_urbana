@@ -99,6 +99,29 @@ async def api_diretrizes(arquivo: UploadFile | None = File(None), texto: str | N
     return d.to_dict()
 
 
+# ------------------------------------------------------------------ analisador de matrícula
+
+class PaginaEntrada(BaseModel):
+    numero: int = Field(..., ge=1)
+    texto: str = ""
+    metodo: str = Field("texto", pattern="^(texto|ocr)$")
+    confianca: float | None = Field(None, ge=0, le=100)
+
+
+class PedidoAnalisador(BaseModel):
+    arquivo: str | None = None
+    paginas: list[PaginaEntrada] = Field(..., min_length=1, max_length=500)
+
+
+@app.post("/api/analisador/extrair", tags=["Analisador de matrícula"])
+def api_analisador_extrair(p: PedidoAnalisador):
+    """Fases 2–3: identificação, atos R-/AV- com página, data e trecho original, sequência e legibilidade.
+    O texto é lido no navegador (PDF ou OCR); nenhum arquivo é armazenado no servidor."""
+    from ..analisador.extracao import Pagina, extrair
+
+    return extrair([Pagina(x.numero, x.texto, x.metodo, x.confianca) for x in p.paginas]).to_dict()
+
+
 # ------------------------------------------------------------------ geo / Google Earth
 
 class PedidoKML(BaseModel):
