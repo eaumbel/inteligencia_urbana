@@ -202,7 +202,7 @@ body.sem-mapa .col-mapa{display:none}
 .az-sit{display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:10px;border:1px solid var(--line);border-left:3px solid var(--secondary);background:var(--surface-2);font-weight:500;line-height:1.5}
 .az-niv{display:inline-block;font-size:10.5px;font-weight:600;letter-spacing:.04em;padding:3px 8px;border-radius:6px;white-space:nowrap}
 .az-niv.CRITICO{background:var(--bad);color:#fff}.az-niv.ALTO{background:var(--bad-soft);color:var(--bad)}
-.az-niv.MODERADO{background:var(--warn-soft);color:var(--warn)}.az-niv.INFORMATIVO{background:var(--info-soft);color:var(--info)}
+.az-niv.ok{background:var(--ok-soft);color:var(--ok)}.az-niv.MODERADO{background:var(--warn-soft);color:var(--warn)}.az-niv.INFORMATIVO{background:var(--info-soft);color:var(--info)}
 .az-lado{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
 @media (max-width:1000px){.az-lado{grid-template-columns:1fr}}
 .az-pag-img{width:100%;border:1px solid var(--line);border-radius:10px;background:#fff}
@@ -1711,7 +1711,7 @@ const az = { atual: null, arquivos: [] };
 const AZ_PASSOS = ["Leitura do documento", "Identificação do número da matrícula", "Identificação do cartório e comarca",
   "Identificação da data de emissão", "Extração integral do conteúdo", "Separação dos registros (R) e averbações (AV)",
   "Organização cronológica dos atos", "Análise individual de cada ato", "Cruzamento das informações", "Geração do relatório"];
-const AZ_PROXIMAS = { 7: "Fases 4–5", 8: "Fase 7", 9: "Fase 10" };  // índices de AZ_PASSOS ainda em desenvolvimento
+const AZ_PROXIMAS = {};  // índices de AZ_PASSOS ainda em desenvolvimento
 const dataBR = iso => iso ? iso.split("-").reverse().join("/") : null;
 
 // armazenamento local (IndexedDB) — cada navegador guarda só as próprias análises
@@ -1801,11 +1801,12 @@ $("#az-ir").onclick = async () => {
     azPassos(4, `${paginas.length} página(s)`);
     const ext = await postJSON("api/analisador/extrair", { arquivo: az.arquivos.map(f => f.name).join(", "),
       paginas: paginas.map(({ numero, texto, metodo, confianca }) => ({ numero, texto, metodo, confianca })) });
-    azPassos(7);
+    azPassos(9, "relatório em PDF");
     const a = { id: Date.now(), criado_em: new Date().toISOString(), arquivo: az.arquivos.map(f => f.name).join(", "), paginas, extracao: ext, correcoes: [] };
     await azSalvar(a);
     az.atual = a;
     document.querySelector('[data-aba="az-dashboard"]').click();
+    azPassos(10); azBaixarPDF();  // relatório em PDF gerado logo após a análise
   } catch (e) { $("#az-passos").insertAdjacentHTML("afterend", `<div class="alerta">${esc(e.message || e)}</div>`); }
   finally { $("#az-ir").disabled = !az.arquivos.length; }
 };
@@ -1833,83 +1834,120 @@ function azAtoLinha(a) {
     <td style="white-space:nowrap">${a.paginas.map(p => azRef({ pagina: p, trecho: a.fonte.trecho }, "pág. " + p)).join("")}${conf}</td></tr>`;
 }
 
+// ---- relatório em PDF (linguagem simples)
+async function azBaixarPDF(botao) {
+  const a = az.atual; if (!a) return;
+  const txt = botao?.innerHTML; if (botao) { botao.disabled = true; botao.textContent = "Gerando relatório…"; }
+  try {
+    const r = await api("api/analisador/relatorio", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ arquivo: a.arquivo, paginas: a.paginas.map(({ numero, texto, metodo, confianca }) => ({ numero, texto, metodo, confianca })) }) });
+    const num = (a.extracao.identificacao.numero_matricula.valor || "").replace(/\D/g, "") || a.id;
+    baixar(await r.blob(), `relatorio-matricula-${num}.pdf`);
+  } catch (e) { alert("Não foi possível gerar o relatório: " + (e.message || e)); }
+  finally { if (botao) { botao.disabled = false; botao.innerHTML = txt; } }
+}
+// análises antigas (salvas antes do motor de regras) são reprocessadas a partir do texto guardado
+async function azGarantirAnalise() {
+  const a = az.atual; if (!a || a.extracao.analise) return;
+  a.extracao = await postJSON("api/analisador/extrair", { arquivo: a.arquivo,
+    paginas: a.paginas.map(({ numero, texto, metodo, confianca }) => ({ numero, texto, metodo, confianca })) });
+  await azSalvar(a);
+}
+const azCls = n => (n || "").normalize("NFD").replace(/[̀-ͯ]/g, "").split(/[\s/]/)[0];
+const AZ_SIT_COR = { "DOCUMENTAÇÃO APARENTEMENTE REGULAR": "var(--ok)", "DOCUMENTAÇÃO COM PONTOS DE ATENÇÃO": "var(--warn)",
+  "DOCUMENTAÇÃO COM RISCOS RELEVANTES": "var(--bad)", "ANÁLISE INCONCLUSIVA": "var(--info)" };
+const AZ_SIT_ONUS = { "ATIVA": "AINDA VALE", "BAIXADA/CANCELADA": "CANCELADA", "PARCIALMENTE CANCELADA": "CANCELADA EM PARTE", "PENDENTE DE CONFIRMAÇÃO": "CONFERIR" };
+const azPags = (pags, trecho) => pags.map(p => azRef({ pagina: p, trecho }, "pág. " + p)).join("");
+const azBotaoPDF = `<button class="btn" data-pdf><i data-lucide="file-down"></i> Baixar relatório em PDF</button>`;
+function azLigarPDF(raiz) { raiz.querySelectorAll("[data-pdf]").forEach(b => b.onclick = () => azBaixarPDF(b)); window.lucide?.createIcons(); }
+
 // ---- dashboard
 function azDashboard() {
   const a = az.atual; if (!a) return azSemAnalise("#az-dash");
-  const e = a.extracao, i = e.identificacao, s = e.estatisticas, q = e.sequencia;
-  const ultimoR = e.atos.filter(x => x.tipo === "R" && x.data).sort((x, y) => x.data.localeCompare(y.data)).pop();
-  const ultimos = [...e.atos].sort((x, y) => y.numero - x.numero).slice(0, 5);
+  const e = a.extracao, i = e.identificacao, s = e.estatisticas, q = e.sequencia, an = e.analise, im = e.imovel || {};
+  const ult = an.transmissoes[an.transmissoes.length - 1];
   $("#az-dash").innerHTML = `
     <div class="card"><h2>${esc(i.numero_matricula.valor ? "Matrícula " + i.numero_matricula.valor : "Matrícula sem número identificado")}</h2>
       <p class="muted" style="margin:0">${esc(a.arquivo)} · analisada em ${new Date(a.criado_em).toLocaleString("pt-BR")} · ${s.paginas} página(s)${s.paginas_ocr ? `, ${s.paginas_ocr} por OCR (confiança média ${fmt(s.confianca_media_ocr, 0)}%)` : ""}</p>
-      <div class="az-sit" style="margin-top:12px"><span class="az-niv INFORMATIVO">EM ANÁLISE</span>
-        <span>Análise inconclusiva por enquanto: a cadeia de proprietários (Fase 4) e a situação dos ônus (Fase 5) ainda não são avaliadas. A ausência de ônus nesta tela não significa matrícula regular.</span></div>
-      <button class="btn sec" id="az-ver-doc">Ver documento e texto extraído</button></div>
+      <div class="az-sit" style="margin-top:12px;border-left-color:${AZ_SIT_COR[an.situacao.classe]}"><div><b style="color:${AZ_SIT_COR[an.situacao.classe]}">${esc(an.situacao.classe)}</b><div>${esc(an.situacao.texto)}</div></div></div>
+      <div style="margin-top:12px">${azBotaoPDF}<button class="btn sec" id="az-ver-doc">Ver documento e texto extraído</button></div>
+      <p class="muted" style="margin:6px 0 0">O relatório explica tudo em linguagem simples, com a página e o ato de cada informação.</p></div>
+    <div class="card"><h2>Resumo em poucas palavras</h2><ul style="margin:0;padding-left:18px;line-height:1.7">${an.resumo.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
     <div class="card"><h2>Identificação</h2><div class="az-grid">
       ${azInd("Número da matrícula", i.numero_matricula)}${azInd("Cartório de registro", i.cartorio)}${azInd("Comarca", i.comarca)}
       ${azInd("Município / UF", { valor: [i.municipio.valor, i.uf.valor].filter(Boolean).join(" / ") || null, fonte: i.municipio.fonte })}
-      ${azInd("Área total registrada", null, null, "Fase 6")}${azInd("Tipo de imóvel", null, null, "Fase 6")}
-      ${azInd("Proprietário atual", null, null, "Fase 4")}${azInd("Abertura da matrícula", i.data_abertura, dataBR)}
-      ${azInd("Data do último registro", { valor: ultimoR?.data || null, fonte: ultimoR && { ...ultimoR.fonte, pagina: ultimoR.paginas[0] } }, v => `${dataBR(v)} <span class="muted" style="font-size:12px">(${ultimoR.id})</span>`)}${azInd("Emissão da certidão", i.data_emissao, dataBR)}
+      ${azInd("Área registrada", im.area)}${azInd("Tipo de imóvel", im.tipo)}
+      ${azInd("Proprietário atual", { valor: an.proprietarios_atuais.join(", ") || null, fonte: ult && { pagina: ult.paginas[0], trecho: "" } }, v => `${esc(v)} <span class="muted" style="font-size:12px">(${ult ? ult.ato : "abertura"})</span>`)}
+      ${azInd("Abertura da matrícula", i.data_abertura, dataBR)}${azInd("Emissão da certidão", i.data_emissao, dataBR)}
     </div></div>
-    <div class="card"><h2>Atos</h2><div class="az-grid">
+    <div class="card"><h2>Atos e ônus</h2><div class="az-grid">
       <div class="az-ind"><small>Registros (R)</small><b>${s.registros}</b></div><div class="az-ind"><small>Averbações (AV)</small><b>${s.averbacoes}</b></div>
       <div class="az-ind"><small>Último ato lido / certificado</small><b>${q.ultimo_ato_lido ?? "—"} / ${q.ultimo_ato_certificado ?? "—"}</b></div>
       <div class="az-ind"><small>Atos não localizados</small><b>${q.faltantes.length ? q.faltantes.join(", ") : "nenhum"}</b></div>
-      ${azInd("Ônus identificados", null, null, "Fase 5")}${azInd("Ônus baixados", null, null, "Fase 5")}${azInd("Restrições aparentemente ativas", null, null, "Fase 5")}
-    </div><p class="muted" style="margin:8px 0 0">Numeração ${esc(q.numeracao)}.</p></div>
+      <div class="az-ind"><small>Ônus identificados</small><b>${an.contagens.onus}</b></div><div class="az-ind"><small>Ônus cancelados</small><b>${an.contagens.onus_baixados}</b></div>
+      <div class="az-ind"><small>Ônus que ainda valem</small><b style="color:${an.contagens.onus_ativos ? "var(--bad)" : "inherit"}">${an.contagens.onus_ativos}</b></div>
+      <div class="az-ind"><small>Ônus a conferir</small><b>${an.contagens.onus_pendentes}</b></div>
+    </div></div>
     <div class="card"><h2>O que aconteceu por último com este imóvel?</h2>
-      <table><tr><th>Ato</th><th>Data</th><th>Natureza (preliminar)</th><th>Onde</th></tr>${ultimos.map(azAtoLinha).join("") || `<tr><td colspan="4">${AZ_NI}</td></tr>`}</table></div>
-    ${e.alertas.length ? `<div class="card"><h2>Pontos de atenção da leitura</h2>${azAlertasHTML(e.alertas)}</div>` : ""}`;
+      <table>${an.ultimos_atos.map(x => `<tr><td style="white-space:nowrap"><b>${x.id}</b><div class="muted">${x.data ? dataBR(x.data) : AZ_NI}</div></td><td>${esc(x.explicacao.simples)}</td><td style="white-space:nowrap">${azPags(x.paginas, x.trecho)}</td></tr>`).join("") || `<tr><td>${AZ_NI}</td></tr>`}</table></div>`;
   $("#az-ver-doc").onclick = () => azVer(1);
-  azLigarRefs($("#az-dash"));
+  azLigarRefs($("#az-dash")); azLigarPDF($("#az-dash"));
 }
-const azAlertasHTML = l => `<table>${l.map(x => `<tr><td style="width:110px"><span class="az-niv ${x.nivel}">${x.nivel}</span></td><td>${esc(x.texto)}<div class="muted">Onde: ${esc(x.onde)}</div></td></tr>`).join("")}</table>`;
+const azAlertasHTML = l => `<table>${l.map(x => `<tr><td style="width:110px"><span class="az-niv ${azCls(x.nivel)}">${x.nivel}</span></td><td>${esc(x.texto)}<div class="muted">Onde: ${esc(x.onde)}</div></td></tr>`).join("")}</table>`;
 
-// ---- histórico registral (linha do tempo de todos os atos)
+// ---- histórico registral: cadeia de proprietários + todos os atos explicados
 function azHistorico() {
   const a = az.atual; if (!a) return azSemAnalise("#az-hist");
-  const atos = azAtos();
-  $("#az-hist").innerHTML = `<div class="card"><h2>Linha do tempo dos atos (${atos.length})</h2>
-    <p class="muted" style="margin:0 0 10px">Ordem dos atos na matrícula. A explicação de cada ato e a cadeia de proprietários chegam nas Fases 4 e 8.</p>
-    <div class="az-tl">${atos.map(x => `<div class="az-tl-item ${x.tipo}"><b>${x.id}</b> — ${x.tipo === "R" ? "Registro" : "Averbação"}
+  const an = a.extracao.analise, orig = Object.fromEntries(azAtos().map(x => [x.id, x]));
+  $("#az-hist").innerHTML = `<div class="card"><h2>Quem foi dono do imóvel</h2>
+    <table><tr><th>Quando</th><th>O que aconteceu</th><th>Onde</th></tr>
+    ${an.proprietario_inicial ? `<tr><td>Abertura</td><td>Primeiro dono anotado: <b>${esc(an.proprietario_inicial.nomes.join(", "))}</b></td><td></td></tr>` : ""}
+    ${an.transmissoes.map(t => `<tr><td style="white-space:nowrap">${t.data ? dataBR(t.data) : AZ_NI}</td><td>${esc(t.explicacao)}${t.fracao ? ` <b>Parte: ${esc(t.fracao)}</b>` : ""}</td><td style="white-space:nowrap"><b>${t.ato}</b> ${azPags(t.paginas, orig[t.ato]?.fonte.trecho)}</td></tr>`).join("") || `<tr><td colspan="3">Nenhuma transmissão identificada no texto lido.</td></tr>`}</table>
+    ${an.alertas_cadeia.map(x => `<div class="alerta">${esc(x)}</div>`).join("")}</div>
+    <div class="card"><h2>Todos os atos, explicados (${an.atos.length})</h2>
+    <div class="az-tl">${an.atos.map(x => `<div class="az-tl-item ${x.tipo}"><b>${x.id}</b> — ${x.tipo === "R" ? "Registro" : "Averbação"} · ${esc(x.natureza)}
       ${x.data ? `· ${dataBR(x.data)}${x.data_origem !== "texto do ato" ? ` (${esc(x.data_origem)})` : ""}` : `· <span class="muted" style="display:inline">${AZ_NI}</span>`}
-      ${x.paginas.map(p => azRef({ pagina: p, trecho: x.fonte.trecho }, "pág. " + p)).join("")}
-      <div>${x.categorias.map(c => `<span class="tag">${esc(c)}</span>`).join("")}</div>
-      <details><summary>Texto original</summary><div class="az-texto">${esc(x.texto_original)}</div></details></div>`).join("") || AZ_NI}</div></div>`;
+      ${azPags(x.paginas, x.trecho)}
+      <div style="margin-top:4px"><span class="muted" style="display:inline">Em palavras simples:</span> ${esc(x.explicacao.simples)}</div>
+      <details><summary>Texto original (versão técnica)</summary><div class="az-texto">${esc(orig[x.id]?.texto_original || x.trecho)}</div></details></div>`).join("") || AZ_NI}</div></div>`;
   azLigarRefs($("#az-hist"));
 }
 
-// ---- ônus (lista preliminar; a situação de cada um depende da Fase 5)
-const AZ_ONUS = ["hipoteca", "alienação fiduciária", "penhora", "arresto/sequestro", "indisponibilidade", "usufruto", "servidão",
-  "cláusulas restritivas", "averbação premonitória/ação", "compromisso de compra e venda", "tombamento", "enfiteuse/aforamento"];
+// ---- ônus: cada constituição ligada ao seu cancelamento
 function azOnus() {
   const a = az.atual; if (!a) return azSemAnalise("#az-onus");
-  const cancel = azAtos().filter(x => x.categorias.includes("cancelamento"));
-  const lista = azAtos().filter(x => !x.categorias.includes("cancelamento") && x.categorias.some(c => AZ_ONUS.includes(c)));
-  $("#az-onus").innerHTML = `<div class="card"><h2>Ocorrências com termos de ônus ou restrição</h2>
-    <div class="alerta" style="border-left-color:var(--info);background:var(--info-soft)">Lista preliminar: atos cujo texto menciona um tipo de ônus. A situação individual (ativa, baixada, parcialmente cancelada, histórica) será determinada na Fase 5, vinculando cada constituição ao respectivo ato de cancelamento. Até lá, todas aparecem como <b>PENDENTE DE CONFIRMAÇÃO</b>.</div>
-    <table><tr><th>Ato</th><th>Tipo mencionado</th><th>Situação</th><th>Onde</th></tr>
-    ${lista.map(x => `<tr><td><b>${x.id}</b><div class="muted">${x.data ? dataBR(x.data) : AZ_NI}</div></td><td>${x.categorias.filter(c => AZ_ONUS.includes(c)).map(c => `<span class="tag onus">${esc(c)}</span>`).join("")}</td>
-      <td><span class="az-niv MODERADO">PENDENTE DE CONFIRMAÇÃO</span></td><td>${x.paginas.map(p => azRef({ pagina: p, trecho: x.fonte.trecho }, "pág. " + p)).join("")}</td></tr>`).join("")
-      || `<tr><td colspan="4">Nenhum ato com termos de ônus foi encontrado no texto lido. Isso não comprova a inexistência de ônus.</td></tr>`}</table></div>
-    <div class="card"><h2>Atos de cancelamento encontrados</h2>
-    <p class="muted" style="margin:0 0 8px">Possíveis baixas. Qual ônus cada um cancela, e se o cancelamento é total ou parcial, será verificado na Fase 5.</p>
-    <table>${cancel.map(x => `<tr><td><b>${x.id}</b><div class="muted">${x.data ? dataBR(x.data) : AZ_NI}</div></td><td>${esc(x.texto_original.slice(0, 220))}…</td>
-      <td>${x.paginas.map(p => azRef({ pagina: p, trecho: x.fonte.trecho }, "pág. " + p)).join("")}</td></tr>`).join("") || `<tr><td>Nenhum ato de cancelamento encontrado no texto lido.</td></tr>`}</table></div>`;
+  const an = a.extracao.analise, orig = Object.fromEntries(azAtos().map(x => [x.id, x]));
+  const cls = { "ATIVA": "CRITICO", "BAIXADA/CANCELADA": "ok", "PARCIALMENTE CANCELADA": "MODERADO", "PENDENTE DE CONFIRMAÇÃO": "MODERADO" };
+  $("#az-onus").innerHTML = `<div class="card"><h2>Dívidas, garantias e bloqueios (ônus)</h2>
+    <p class="muted" style="margin:0 0 10px">Um ônus só aparece como cancelado quando a matrícula tem o ato que o cancela. Quitar a dívida não é o mesmo que cancelar o registro.</p>
+    <table><tr><th>Ato</th><th>Tipo e explicação</th><th>Situação</th><th>Onde</th></tr>
+    ${an.onus.map(o => `<tr><td><b>${o.ato}</b><div class="muted">${o.data ? dataBR(o.data) : AZ_NI}</div></td>
+      <td><span class="tag onus">${esc(o.tipo)}</span><div>${esc(o.explicacao)}</div>
+        <div class="muted">${[o.credor && "Credor: " + o.credor, o.valor && "Valor: " + o.valor, o.processo && "Processo: " + o.processo, o.vara].filter(Boolean).map(esc).join(" · ")}</div>
+        ${o.observacao ? `<div class="muted"><b>Observação:</b> ${esc(o.observacao)}</div>` : ""}</td>
+      <td><span class="az-niv ${cls[o.situacao] || "INFORMATIVO"}">${AZ_SIT_ONUS[o.situacao] || o.situacao}</span>${o.ato_baixa ? `<div class="muted">por ${o.ato_baixa}${o.data_baixa ? " em " + dataBR(o.data_baixa) : ""}</div>` : ""}</td>
+      <td style="white-space:nowrap">${azPags(o.paginas, orig[o.ato]?.fonte.trecho)}${o.ato_baixa && orig[o.ato_baixa] ? azPags(orig[o.ato_baixa].paginas, orig[o.ato_baixa].fonte.trecho) : ""}</td></tr>`).join("")
+      || `<tr><td colspan="4">Nenhum ônus foi encontrado no texto lido. Isso não comprova, sozinho, que o imóvel está livre.</td></tr>`}</table></div>`;
   azLigarRefs($("#az-onus"));
 }
 function azRiscos() {
   const a = az.atual; if (!a) return azSemAnalise("#az-riscos");
-  $("#az-riscos").innerHTML = `<div class="card"><h2>Pontos de atenção identificados até agora</h2>
-    <p class="muted">Nesta fase, os alertas tratam da leitura do documento (legibilidade, sequência de atos, datas, emissão). O motor de riscos jurídicos chega na Fase 7.</p>
-    ${a.extracao.alertas.length ? azAlertasHTML(a.extracao.alertas) : "<p>Nenhum ponto de atenção de leitura.</p>"}</div>`;
+  const r = a.extracao.analise.riscos;
+  $("#az-riscos").innerHTML = `<div class="card"><h2>Pontos de atenção (${r.length})</h2>
+    ${r.length ? `<table>${r.map(x => `<tr><td style="width:110px"><span class="az-niv ${azCls(x.nivel)}">${x.nivel}</span></td>
+      <td><b>${esc(x.titulo)}</b><div>${esc(x.porque)}</div><div class="muted">Onde: ${esc(x.onde)} · O que conferir: ${esc(x.verificar)}</div><div class="muted">Documento que resolve: ${esc(x.documento)}</div></td></tr>`).join("")}</table>`
+      : "<p>Nenhum ponto de atenção encontrado pelas regras do sistema. Isso não substitui uma certidão atualizada nem a análise de um profissional.</p>"}</div>
+    <div class="card"><h2>O que pedir antes de fechar negócio</h2><ul style="margin:0;padding-left:18px;line-height:1.7">${a.extracao.analise.documentos_recomendados.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>`;
 }
 function azRelatorios() {
   const a = az.atual; if (!a) return azSemAnalise("#az-rel");
-  $("#az-rel").innerHTML = `<div class="card"><h2>Relatório técnico</h2>
-    <p class="muted">O relatório técnico em PDF chega na Fase 10. Já é possível baixar os dados extraídos, com página, ato e trecho original de cada informação.</p>
-    <button class="btn" id="az-json">Baixar dados extraídos (JSON)</button></div>`;
+  $("#az-rel").innerHTML = `<div class="card"><h2>Relatório da matrícula (PDF)</h2>
+    <p>Um documento em linguagem simples, que qualquer pessoa entende: situação geral, quem é o dono, dívidas e se foram canceladas,
+    pontos de atenção, o que pedir antes de fechar negócio e cada ato explicado ao lado do texto original, sempre com a página.</p>
+    ${azBotaoPDF}</div>
+    <div class="card"><h2>Dados técnicos</h2><p class="muted">Para integração com outros sistemas: todos os dados extraídos, com página, ato e trecho original.</p>
+    <button class="btn sec" id="az-json">Baixar dados técnicos (JSON)</button></div>`;
+  azLigarPDF($("#az-rel"));
   $("#az-json").onclick = () => { const { paginas, ...resto } = a;
     baixar(new Blob([JSON.stringify({ ...resto, paginas: paginas.map(({ imagem, ...p }) => p) }, null, 2)], { type: "application/json" }), `matricula_${a.extracao.identificacao.numero_matricula.valor || a.id}.json`); };
 }
@@ -1926,7 +1964,10 @@ async function azLista() {
 }
 $("#az-limpar").onclick = async () => { if (!confirm("Apagar todas as análises salvas neste navegador?")) return;
   for (const x of await azListar()) await azApagar(x.id); az.atual = null; alert("Análises apagadas."); };
-function azAoAbrir(aba) {
+async function azAoAbrir(aba) {
+  if (aba !== "az-lista" && az.atual && !az.atual.extracao.analise) {
+    try { await azGarantirAnalise(); } catch (e) { alert("Não foi possível atualizar esta análise: " + (e.message || e)); return; }
+  }
   ({ "az-dashboard": azDashboard, "az-historico": azHistorico, "az-onus": azOnus, "az-riscos": azRiscos, "az-relatorios": azRelatorios, "az-lista": azLista })[aba]?.();
 }
 

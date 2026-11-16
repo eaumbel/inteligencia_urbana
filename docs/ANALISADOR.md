@@ -17,7 +17,7 @@ e acrescenta módulos próprios, separados por responsabilidade:
 | Extração estruturada | `analisador/extracao.py` | Identificação, separação R-/AV-, datas, páginas, sequência e lacunas |
 | Motor de regras | `analisador/regras.py` (Fases 4–7) | Cadeia dominial, ônus × cancelamentos, área/perímetro, atualidade, riscos |
 | Interpretação por IA | `analisador/ia.py` (Fase 8) | Explicações em linguagem simples **a partir dos fatos extraídos**; chave só no servidor |
-| Relatórios | `analisador/relatorio.py` (Fase 10) | PDF técnico com referências a página e ato |
+| Relatórios | `analisador/relatorio.py` (Fase 10) | PDF em linguagem simples (leitura de 5º ano), com referências a página e ato e o trecho original de cada ato |
 | Banco de dados | Supabase/PostgreSQL (fase de persistência) | Usuários, documentos, atos, ônus, alertas, correções — com isolamento por usuário (RLS) |
 
 Regras de confiabilidade (valem para todas as fases):
@@ -35,13 +35,13 @@ Regras de confiabilidade (valem para todas as fases):
 | 1 | Estrutura, menu, upload de PDF/JPG/PNG com várias páginas, progresso | ✅ concluída |
 | 2 | Leitura integral por página (texto ou OCR com confiança), visualização do texto original | ✅ concluída |
 | 3 | Identificação e classificação de registros e averbações (páginas, datas, sequência, lacunas) | ✅ base concluída |
-| 4 | Cadeia dominial e sucessões (linha do tempo de proprietários) | pendente |
-| 5 | Ônus, garantias e baixas (constituição ↔ cancelamento) | pendente |
+| 4 | Cadeia dominial e sucessões (linha do tempo de proprietários) | ✅ base concluída (`regras.py`) |
+| 5 | Ônus, garantias e baixas (constituição ↔ cancelamento) | ✅ base concluída: baixa só com ato que cita o ônus; sem citação → PENDENTE DE CONFIRMAÇÃO |
 | 6 | Localização e caracterização (reaproveita o leitor de perímetro e o mapa) | pendente |
-| 7 | Motor de riscos e inconsistências | pendente |
-| 8 | Tradutor jurídico (versão técnica × simplificada) | pendente |
-| 9 | Dashboard completo e linha do tempo | parcial (indicadores da Fase 3) |
-| 10 | Relatório técnico em PDF | pendente |
+| 7 | Motor de riscos e inconsistências | ✅ base concluída (CRÍTICO, ALTO, MODERADO, INFORMATIVO) |
+| 8 | Tradutor jurídico (versão técnica × simplificada) | ✅ por regras (sem IA): explicação simples gerada só com fatos extraídos + trecho original |
+| 9 | Dashboard completo e linha do tempo | ✅ situação, resumo, dono atual, ônus, últimos atos explicados |
+| 10 | Relatório em PDF em linguagem simples | ✅ `relatorio.py` (reportlab), baixado automaticamente ao fim da análise |
 | 11 | Testes de precisão com o conjunto de casos | contínuo |
 | — | Persistência (Supabase), login, isolamento e registro de atividades | depende de decisão (ver abaixo) |
 

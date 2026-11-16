@@ -20,7 +20,10 @@ logo é aplicada dentro de um selo branco para preservar o azul original.
 Menu próprio (Dashboard, Nova análise, Matrículas analisadas, Histórico registral, Ônus e restrições, Análise de
 riscos, Relatórios, Configurações). Recebe PDF (com texto ou digitalizado) ou imagens JPG/PNG, lê cada página
 (texto do PDF ou OCR com confiança), separa registros e averbações e mostra cada informação com página, ato e trecho
-original, lado a lado com o documento. Arquitetura, regras de confiabilidade e fases em
+original, lado a lado com o documento. Ao fim da análise, gera um **relatório em PDF em linguagem simples** (para
+qualquer pessoa entender): situação geral, quem é o dono e como o imóvel passou de mão em mão, dívidas e se foram
+canceladas, pontos de atenção, o que pedir antes de fechar negócio e cada ato explicado ao lado do texto original.
+Arquitetura, regras de confiabilidade e fases em
 [docs/ANALISADOR.md](docs/ANALISADOR.md).
 
 ## Passo a passo (aba "Novo estudo")

@@ -81,6 +81,8 @@ class Extracao:
     sequencia: dict
     legibilidade: list[dict]
     alertas: list[dict] = field(default_factory=list)
+    imovel: dict[str, Campo] = field(default_factory=dict)  # caracterização na abertura da matrícula
+    abertura: str = ""  # texto entre o cabeçalho e o primeiro ato (proprietário inicial, descrição)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -339,4 +341,20 @@ def extrair(paginas: list[Pagina]) -> Extracao:
         "averbacoes": sum(1 for a in atos if a.tipo == "AV"),
         "caracteres": len(doc.texto),
     }
-    return Extracao(ident, atos, stats, seq, legib, alertas)
+    # abertura: do início até o primeiro ato
+    t = doc.texto
+    ini_atos = min((t.find(a.texto_original[:60]) for a in atos if t.find(a.texto_original[:60]) >= 0), default=len(t))
+    abertura = t[:ini_atos][-4000:]
+    area = getattr(base, "area_declarada_txt", None) or (f"{base.area_declarada_m2:,.2f} m²".replace(",", "X").replace(".", ",").replace("X", ".") if base.area_declarada_m2 else None)
+    imovel = {
+        "tipo": Campo(base.tipo_imovel if base.tipo_imovel != "indefinido" else None),
+        "area": doc.campo(area),
+        "lote": doc.campo(base.lote, r"\blote\b[^\n]{0,20}" + re.escape(str(base.lote)) if base.lote else None),
+        "quadra": doc.campo(base.quadra, r"quadra[^\n]{0,20}" + re.escape(str(base.quadra)) if base.quadra else None),
+        "loteamento": doc.campo(base.loteamento),
+        "endereco": doc.campo(base.endereco),
+        "inscricao_imobiliaria": doc.campo(base.inscricao_imobiliaria),
+        "ccir": doc.campo(base.ccir),
+        "car": doc.campo(base.car),
+    }
+    return Extracao(ident, atos, stats, seq, legib, alertas, imovel, abertura)

@@ -94,3 +94,88 @@ def test_api_extrair():
     assert r["identificacao"]["numero_matricula"]["valor"] == "12.345"
     assert [a["id"] for a in r["atos"]] == ["R-1", "R-2", "AV-3", "AV-5"]
     assert c.post("/api/analisador/extrair", json={"paginas": []}).status_code == 422
+
+
+# ---------------------------------------------------------------- regras e relatório (documentos fictícios)
+
+from datetime import date  # noqa: E402
+
+from inteligencia_urbana.analisador.regras import analisar  # noqa: E402
+from inteligencia_urbana.analisador.relatorio import gerar_pdf  # noqa: E402
+
+CADEIA = [Pagina(1, """REGISTRO DE IMÓVEIS DA COMARCA DE LONDRINA - PR
+1º SERVIÇO DE REGISTRO DE IMÓVEIS DE LONDRINA - PR
+MATRÍCULA Nº 50.001
+DATA 10 de janeiro de 2000
+IMÓVEL: Lote nº 12 da Quadra 8, com a área de 300,00 m².
+PROPRIETÁRIO: CARLOS FICTÍCIO, brasileiro.
+R-1/50.001 - Em 05/05/2005. COMPRA E VENDA. TRANSMITENTE: CARLOS FICTÍCIO, brasileiro. ADQUIRENTE: MARIA EXEMPLO, brasileira. VALOR: R$ 80.000,00.
+R-2/50.001 - Em 06/06/2010. HIPOTECA em favor do Banco Exemplo S.A., valor R$ 40.000,00.
+AV-3/50.001 - Em 07/07/2012. Consta quitação da dívida da hipoteca do R-2, conforme declaração do credor.
+R-4/50.001 - Em 08/08/2015. COMPRA E VENDA. TRANSMITENTE: MARIA EXEMPLO, brasileira. ADQUIRENTES: PEDRO TESTE, brasileiro, e PAULA TESTE, brasileira. VALOR: R$ 150.000,00.
+AV-5/50.001 - Em 09/09/2020. PENHORA extraída dos autos nº 0009999-11.2020.8.16.0014, da 2ª Vara Cível de Londrina.
+AV-6/50.001 - Em 10/10/2021. CANCELAMENTO. Fica cancelada a penhora objeto da AV-5, por ordem judicial.
+CERTIDÃO Nº 1
+CERTIFICO que a presente é reprodução da matrícula nº 50.001 (sendo último ato nº 6/50.001).
+Londrina, 01 de agosto de 2026.""")]
+
+
+@pytest.fixture(scope="module")
+def an_cadeia():
+    e = extrair(CADEIA)
+    return e, analisar(e, date(2026, 11, 16))
+
+
+def test_cadeia_de_proprietarios(an_cadeia):
+    _, an = an_cadeia
+    assert an.proprietario_inicial["nomes"] == ["CARLOS FICTÍCIO"]
+    assert [(t.ato, t.de, t.para) for t in an.transmissoes] == [
+        ("R-1", ["CARLOS FICTÍCIO"], ["MARIA EXEMPLO"]), ("R-4", ["MARIA EXEMPLO"], ["PEDRO TESTE", "PAULA TESTE"])]
+    assert an.proprietarios_atuais == ["PEDRO TESTE", "PAULA TESTE"]
+    assert an.cadeia_completa
+
+
+def test_onus_so_baixa_com_ato_de_cancelamento(an_cadeia):
+    _, an = an_cadeia
+    onus = {o.ato: o for o in an.onus}
+    penhora, hipoteca = onus["AV-5"], onus["R-2"]
+    assert penhora.situacao == "BAIXADA/CANCELADA" and penhora.ato_baixa == "AV-6"
+    assert penhora.processo == "0009999-11.2020.8.16.0014"
+    # quitação não é cancelamento registral
+    assert hipoteca.situacao == "ATIVA" and hipoteca.ato_baixa is None
+    assert "Banco Exemplo" in hipoteca.credor
+    assert any(r.nivel == "ALTO" and "Hipoteca" in r.titulo for r in an.riscos)
+    assert not any(r.nivel == "CRÍTICO" for r in an.riscos)
+    assert an.situacao["classe"] == "DOCUMENTAÇÃO COM RISCOS RELEVANTES"
+
+
+def test_atualidade_e_explicacao_simples(an_cadeia):
+    _, an = an_cadeia
+    assert an.atualidade["dias_desde_emissao"] == 107
+    assert "certidão atualizada" in an.atualidade["texto"]
+    assert any(r.nivel == "INFORMATIVO" and "30 dias" in r.titulo for r in an.riscos)
+    r4 = next(x for x in an.atos if x.id == "R-4")
+    assert "MARIA EXEMPLO vendeu o imóvel para PEDRO TESTE e PAULA TESTE" in r4.explicacao.simples
+
+
+def test_cancelamento_sem_numero_fica_pendente():
+    e = extrair([Pagina(1, """MATRÍCULA Nº 60.002
+R-1/60.002 - Em 01/02/2010. HIPOTECA em favor do Banco Exemplo S.A.
+AV-2/60.002 - Em 01/02/2015. CANCELAMENTO da hipoteca, a pedido do credor.""")])
+    o = analisar(e).onus[0]
+    assert o.situacao == "PENDENTE DE CONFIRMAÇÃO" and o.ato_baixa == "AV-2"
+
+
+def test_relatorio_pdf(an_cadeia):
+    e, an = an_cadeia
+    pdf = gerar_pdf(e, an, "ficticia.pdf", date(2026, 11, 16))
+    assert pdf.startswith(b"%PDF") and len(pdf) > 5000
+
+
+def test_api_relatorio_pdf():
+    c = TestClient(app)
+    r = c.post("/api/analisador/relatorio", json={"arquivo": "f.pdf", "paginas": [{"numero": 1, "texto": CADEIA[0].texto}]})
+    assert r.status_code == 200 and r.headers["content-type"] == "application/pdf"
+    assert 'relatorio-matricula-50001.pdf' in r.headers["content-disposition"] and r.content.startswith(b"%PDF")
+    d = c.post("/api/analisador/extrair", json={"paginas": [{"numero": 1, "texto": CADEIA[0].texto}]}).json()
+    assert d["analise"]["proprietarios_atuais"] == ["PEDRO TESTE", "PAULA TESTE"]

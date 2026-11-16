@@ -118,7 +118,26 @@ def api_analisador_extrair(p: PedidoAnalisador):
     O texto é lido no navegador (PDF ou OCR); nenhum arquivo é armazenado no servidor."""
     from ..analisador.extracao import Pagina, extrair
 
-    return extrair([Pagina(x.numero, x.texto, x.metodo, x.confianca) for x in p.paginas]).to_dict()
+    from ..analisador.regras import analisar
+
+    ext = extrair([Pagina(x.numero, x.texto, x.metodo, x.confianca) for x in p.paginas])
+    return {**ext.to_dict(), "analise": analisar(ext).to_dict()}
+
+
+@app.post("/api/analisador/relatorio", tags=["Analisador de matrícula"])
+def api_analisador_relatorio(p: PedidoAnalisador):
+    """Relatório em PDF, em linguagem simples, com referências a ato e página."""
+    import re as _re
+
+    from ..analisador.extracao import Pagina, extrair
+    from ..analisador.regras import analisar
+    from ..analisador.relatorio import gerar_pdf
+
+    ext = extrair([Pagina(x.numero, x.texto, x.metodo, x.confianca) for x in p.paginas])
+    pdf = gerar_pdf(ext, analisar(ext), p.arquivo)
+    num = _re.sub(r"\D", "", ext.identificacao["numero_matricula"].valor or "") or "sem-numero"
+    return Response(pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="relatorio-matricula-{num}.pdf"'})
 
 
 # ------------------------------------------------------------------ geo / Google Earth
