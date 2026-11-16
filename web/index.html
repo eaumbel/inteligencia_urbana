@@ -4,57 +4,320 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Inteligência Urbana</title>
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<meta name="theme-color" content="#142D3A">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
 <style>
-  :root { --bg:#f4f5f2; --card:#fff; --ink:#1f2a24; --muted:#5f6b64; --line:#dde2dc; --acc:#1f6f50; --warn:#b4541a; --ok:#2e7d32; }
-  * { box-sizing: border-box; }
-  body { margin:0; font:14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--ink); }
-  header { background:var(--acc); color:#fff; padding:12px 20px; display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; }
-  header h1 { font-size:18px; margin:0; }
-  header span { opacity:.8; font-size:13px; }
-  nav { display:flex; gap:4px; padding:8px 16px 0; flex-wrap:wrap; border-bottom:1px solid var(--line); background:#fff; }
-  nav button { border:0; background:none; padding:10px 14px; cursor:pointer; font:inherit; color:var(--muted); border-bottom:3px solid transparent; }
-  nav button.ativo { color:var(--acc); border-color:var(--acc); font-weight:600; }
-  main { display:grid; grid-template-columns: minmax(340px, 520px) 1fr; gap:16px; padding:16px; }
-  @media (max-width: 900px) { main { grid-template-columns: 1fr; } #mapa { height: 380px !important; } }
-  .painel { display:none; } .painel.ativo { display:block; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px; margin-bottom:12px; }
-  .card h2 { font-size:15px; margin:0 0 10px; }
-  label { display:block; font-size:12px; color:var(--muted); margin:8px 0 3px; }
-  input, select, textarea { width:100%; padding:7px 8px; border:1px solid var(--line); border-radius:6px; font:inherit; background:#fff; color:var(--ink); }
-  textarea { min-height:160px; font-family: ui-monospace, Menlo, monospace; font-size:12px; }
-  .grade { display:grid; grid-template-columns: 1fr 1fr; gap:0 10px; }
-  .btn { background:var(--acc); color:#fff; border:0; border-radius:6px; padding:8px 14px; cursor:pointer; font:inherit; margin:10px 6px 0 0; }
-  .btn.sec { background:#fff; color:var(--acc); border:1px solid var(--acc); }
-  #mapa { height: calc(100vh - 140px); min-height:420px; border-radius:8px; border:1px solid var(--line); }
-  .kpis { display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:8px; }
-  .kpi { background:#f7f9f6; border:1px solid var(--line); border-radius:6px; padding:8px; }
-  .kpi b { display:block; font-size:16px; } .kpi small { color:var(--muted); }
-  table { width:100%; border-collapse:collapse; font-size:12px; }
-  th, td { border-bottom:1px solid var(--line); padding:4px 6px; text-align:left; vertical-align:top; }
-  .alerta { overflow-wrap:anywhere; background:#fff4ec; border-left:4px solid var(--warn); padding:6px 10px; margin:4px 0; font-size:13px; }
-  .tag { display:inline-block; padding:1px 7px; border-radius:10px; font-size:11px; background:#e8efe9; margin:1px; }
-  .tag.onus { background:#fde2d4; color:#8a3510; }
-  .muted { color:var(--muted); font-size:12px; }
-  #mp-svg svg { width:100%; height:auto; border:1px solid var(--line); border-radius:6px; }
-  details summary { cursor:pointer; color:var(--acc); margin:6px 0; }
+:root{
+  /* Identidade oficial: azul-petróleo, off-white e dourado discreto */
+  --primary:#142D3A; --secondary:#315568; --gold:#C6A66B; --gold-soft:#F5EEDF;
+  --bg:#F4F5F2; --surface:#FFFFFF; --surface-2:#F8F9F6; --ink:#16262F; --muted:#5F6E76;
+  --line:#E3E6E0; --line-strong:#CDD3CE;
+  --accent:#142D3A; --accent-ink:#FFFFFF; --accent-soft:#E4ECEF; --accent-map:#C6A66B;
+  --steel:#315568; --steel-soft:#E8EEF1;
+  --side:#142D3A; --side-2:#1C3A4A; --side-ink:#E8EFF2; --side-muted:#93A9B4; --side-line:#2A4757;
+  --ok:#27866A; --ok-soft:#E2F1EB; --warn:#D49A3A; --warn-soft:#FBF1E0; --bad:#C65353; --bad-soft:#F9E7E7; --info:#315568; --info-soft:#E6EEF2;
+  --font-display:"Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body:"Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --r:12px; --r-sm:8px;
+  --shadow:0 1px 2px rgba(20,45,58,.04), 0 6px 18px -12px rgba(20,45,58,.12);
+  --shadow-lg:0 24px 56px -24px rgba(20,45,58,.35);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0D1A21; --surface:#13242E; --surface-2:#182C38; --ink:#E6EDF0; --muted:#97A9B2;
+    --line:#223845; --line-strong:#2F4A5A;
+    --accent:#C6A66B; --accent-ink:#142D3A; --accent-soft:#2C2A20; --accent-map:#D8B97C;
+    --steel:#9FB8C6; --steel-soft:#1C3340;
+    --side:#0A161C; --side-2:#14262F; --side-ink:#E6EDF0; --side-muted:#8399A4; --side-line:#1E3440;
+    --ok:#4DB592; --ok-soft:#163A2E; --warn:#E3B062; --warn-soft:#3A2F1A; --bad:#E07B7B; --bad-soft:#3A1E1E; --info:#8FB3C7; --info-soft:#1A3241;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -16px rgba(0,0,0,.6);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0D1A21; --surface:#13242E; --surface-2:#182C38; --ink:#E6EDF0; --muted:#97A9B2;
+  --line:#223845; --line-strong:#2F4A5A;
+  --accent:#C6A66B; --accent-ink:#142D3A; --accent-soft:#2C2A20; --accent-map:#D8B97C;
+  --steel:#9FB8C6; --steel-soft:#1C3340;
+  --side:#0A161C; --side-2:#14262F; --side-ink:#E6EDF0; --side-muted:#8399A4; --side-line:#1E3440;
+  --ok:#4DB592; --ok-soft:#163A2E; --warn:#E3B062; --warn-soft:#3A2F1A; --bad:#E07B7B; --bad-soft:#3A1E1E; --info:#8FB3C7; --info-soft:#1A3241;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -16px rgba(0,0,0,.6);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased;font-feature-settings:"cv11","ss01"}
+h1,h2,h3{font-family:var(--font-display);margin:0;line-height:1.25;letter-spacing:-.015em;text-wrap:balance;font-weight:600;color:var(--ink)}
+a{color:var(--accent)}
+:focus-visible{outline:2.5px solid var(--accent);outline-offset:2px;border-radius:6px}
+
+/* ---------- Estrutura: menu lateral + área de trabalho ---------- */
+.app{display:grid;grid-template-columns:256px minmax(0,1fr);min-height:100%}
+.side{background:var(--side);color:var(--side-ink);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;padding:22px 14px 16px}
+.brand{display:flex;align-items:center;gap:11px;padding:0 8px 18px}
+.brand-mark{width:46px;height:46px;border-radius:10px;background:#FFFFFF;display:grid;place-items:center;flex:none;padding:3px;box-shadow:0 0 0 1px rgba(198,166,107,.55)}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block}
+.brand b{font-family:var(--font-display);font-size:15px;font-weight:600;letter-spacing:-.01em;display:block;color:#fff;white-space:nowrap}
+.brand span{font-size:12px;color:var(--side-muted);white-space:nowrap}
+#abas{display:flex;flex-direction:column;gap:2px}
+.nav-label{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--side-muted);padding:14px 12px 6px;font-weight:700}
+#abas button{display:flex;align-items:center;gap:11px;padding:8px 12px;border-radius:8px;color:var(--side-ink);background:transparent;border:0;font:inherit;font-weight:500;font-size:13.5px;cursor:pointer;text-align:left;transition:background .15s,color .15s;opacity:.9}
+#abas button svg{width:18px;height:18px;flex:none;stroke-width:1.75;opacity:.8}
+#abas button:hover{background:var(--side-2);opacity:1}
+#abas button.ativo{background:var(--side-2);color:#fff;font-weight:600;opacity:1;box-shadow:inset 3px 0 0 var(--gold)}
+#abas button.ativo svg{opacity:1;color:var(--gold)}
+.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:8px}
+.side-foot button{display:flex;align-items:center;gap:9px;height:36px;padding:0 12px;border-radius:8px;border:1px solid var(--side-line);background:transparent;color:var(--side-ink);font:inherit;font-weight:500;font-size:13px;cursor:pointer}
+.side-foot button:hover{background:var(--side-2)}
+.side-foot button svg{width:16px;height:16px}
+.side-foot small{color:var(--side-muted);font-size:11.5px;padding:0 4px}
+
+.principal{min-width:0;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;gap:14px;padding:20px 28px 4px}
+.topbar h1{font-size:22px;font-weight:600;letter-spacing:-.02em}
+.topbar .sub{color:var(--muted);font-size:13.5px;margin-top:3px}
+.menu-btn{display:none;width:38px;height:38px;border-radius:10px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);cursor:pointer;place-items:center}
+.menu-btn svg{width:20px;height:20px}
+i[data-lucide]{display:inline-block;width:18px;height:18px;flex:none}
+.trabalho > *{min-width:0}
+.trabalho{display:grid;grid-template-columns:minmax(360px,520px) minmax(0,1fr);gap:20px;padding:16px 28px 28px;align-items:start}
+.col-mapa{position:sticky;top:16px}
+#mapa{height:calc(100vh - 120px);min-height:440px;border-radius:var(--r);border:1px solid var(--line);box-shadow:var(--shadow);background:var(--surface-2)}
+
+/* ---------- Componentes ---------- */
+.painel{display:none;flex-direction:column;gap:16px}
+.painel.ativo{display:flex}
+.painel > div:empty{display:none}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:18px 20px 20px}
+.card + .card{margin-top:16px}
+.card h2{font-size:15px;font-weight:600;margin-bottom:12px}
+label{display:block;font-size:12.5px;font-weight:500;color:var(--muted);margin:12px 0 6px}
+input,select,textarea{width:100%;min-width:0;height:40px;padding:0 12px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);color:var(--ink);font:inherit;transition:border-color .15s,box-shadow .15s}
+textarea{height:auto;min-height:150px;padding:10px 12px;resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;line-height:1.45}
+input[type=file]{height:auto;padding:9px 10px;background:var(--surface-2)}
+input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent);vertical-align:-3px;margin-right:6px}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.grade{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:38px;padding:0 16px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);font:inherit;font-weight:600;font-size:13.5px;cursor:pointer;margin:14px 6px 0 0;white-space:nowrap;transition:filter .15s,background .15s,transform .05s}
+.btn:hover{filter:brightness(1.08)}
+.btn:active{transform:translateY(1px)}
+.btn.sec{background:var(--surface);color:var(--ink);border-color:var(--line-strong)}
+.btn.sec:hover{background:var(--surface-2);border-color:var(--muted);filter:none}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.kpi small{display:block;font-size:12px;color:var(--muted);font-weight:500}
+.kpi b{display:block;font-family:var(--font-display);font-size:18px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:2px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+.card{overflow-x:auto}
+th{text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top;background:var(--surface-2)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;font-variant-numeric:tabular-nums;line-height:1.5}
+tr:hover td{background:color-mix(in srgb,var(--surface-2) 70%,transparent)}
+table th:first-child,table td:first-child{padding-left:14px}
+tr:last-child td,tr:last-child th{border-bottom:0}
+.alerta{overflow-wrap:anywhere;display:flex;gap:10px;background:var(--warn-soft);color:var(--ink);border:1px solid color-mix(in srgb,var(--warn) 28%,transparent);border-left:3px solid var(--warn);border-radius:8px;padding:10px 12px;margin:8px 0;font-size:13.5px}
+.tag{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 9px;border-radius:6px;font-size:11.5px;font-weight:500;background:var(--steel-soft);color:var(--steel);margin:2px 2px 2px 0}
+.tag.onus{background:var(--bad-soft);color:var(--bad)}
+.muted{color:var(--muted);font-size:12.5px}
+details summary{cursor:pointer;color:var(--accent);font-weight:700;margin:10px 0 6px}
+ul{padding-left:20px;margin:6px 0} li{margin:3px 0}
+.leaflet-tooltip.medida{background:rgba(20,45,58,.86);color:#fff;border:0;border-radius:6px;padding:2px 6px;font:600 11.5px/1.3 var(--font-body);box-shadow:none;white-space:nowrap}
+.leaflet-tooltip.medida::before{display:none}
+.leaflet-tooltip.medida-area{background:#142D3A;color:#F5EEDF;font-size:12.5px;padding:4px 8px;box-shadow:inset 0 0 0 1px #C6A66B}
+.leaflet-tooltip.medida-cota{background:rgba(141,110,99,.9);font-size:10px;padding:0 4px}
+.leaflet-tooltip.medida-lote{background:rgba(255,255,255,.9);color:#1f2a24;font-size:10px;line-height:1.15;text-align:center;padding:1px 4px}
+.leaflet-container.desenhando{cursor:crosshair}
+.etapa-h{display:flex;gap:14px;align-items:flex-start}
+.etapa-h h2{margin:2px 0 2px}
+.etapa-h .muted{margin:0}
+.etapa-n{flex:none;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-family:var(--font-display);font-weight:600;font-size:14px;background:var(--primary);color:#fff}
+.etapa-st{margin-left:auto;flex:none;font-size:12px;font-weight:600;padding:3px 10px;border-radius:6px;background:var(--surface-2);color:var(--muted);white-space:nowrap}
+.etapa.feita .etapa-n{background:var(--ok)}
+.etapa.feita .etapa-st{background:var(--ok-soft);color:var(--ok)}
+.etapa.bloqueada{opacity:.55}
+.etapa.bloqueada .etapa-b{display:none}
+.etapa.bloqueada .etapa-n{background:var(--line-strong)}
+.etapa-b{margin-top:12px}
+.etapa-st:empty{display:none}
+.passos{margin:8px 0 0;padding-left:18px;font-size:13px;color:var(--muted)}
+#mp-svg svg,.mp-svg svg{width:100%;height:auto;border:1px solid var(--line);border-radius:10px;background:#fafafa}
+
+/* ---------- Mapa (Leaflet) no tema do app ---------- */
+.leaflet-container{font-family:var(--font-body)}
+.leaflet-bar a,.leaflet-control-layers{background:var(--surface);color:var(--ink);border-color:var(--line)!important}
+.leaflet-control-layers-expanded{padding:10px 12px;border-radius:12px!important;box-shadow:var(--shadow)!important;font-size:13px}
+.leaflet-control-layers-separator{border-top-color:var(--line)}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--surface);color:var(--ink);box-shadow:var(--shadow-lg)}
+.leaflet-popup-content-wrapper{border-radius:12px}
+.leaflet-popup-content{font-size:13px}
+.leaflet-popup-content th,.leaflet-popup-content td{padding:3px 6px}
+
+@media (max-width:1100px){
+  .trabalho{grid-template-columns:minmax(0,1fr)}
+  .col-mapa{position:static;order:-1}
+  #mapa{height:420px;min-height:0}
+}
+@media (max-width:900px){
+  .app{grid-template-columns:1fr}
+  .side{position:fixed;inset:0 auto 0 0;width:260px;z-index:1100;transform:translateX(-100%);transition:transform .25s;height:100%}
+  body.nav-aberta .side{transform:none;box-shadow:var(--shadow-lg)}
+  body.nav-aberta::after{content:"";position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1050}
+  .menu-btn{display:grid}
+  .topbar{padding:16px 16px 4px}
+  .topbar h1{font-size:20px}
+  .trabalho{padding:12px 16px 32px}
+}
+@media (max-width:560px){ .az-sit{flex-direction:column;align-items:flex-start;gap:8px} .grade{grid-template-columns:1fr} #mapa{height:340px} }
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ---------- Analisador de matrícula ---------- */
+#abas{overflow-y:auto;min-height:0}
+body.sem-mapa .trabalho{grid-template-columns:minmax(0,1fr)}
+body.sem-mapa .col-mapa{display:none}
+.az-drop{display:block;margin-top:14px;border:1.5px dashed var(--line-strong);border-radius:12px;padding:32px;text-align:center;cursor:pointer;font-weight:400;color:var(--ink);background:var(--surface-2);transition:border-color .15s,background .15s}
+.az-drop:hover,.az-drop.sobre{border-color:var(--gold);background:var(--gold-soft)}
+.az-drop b{color:var(--primary);font-weight:600}
+.az-passos{margin:0;padding-left:0;list-style:none;display:grid;gap:6px}
+.az-passos li{display:flex;gap:10px;align-items:center;font-size:14px;color:var(--muted)}
+.az-passos li::before{content:"";width:12px;height:12px;border-radius:50%;border:2px solid var(--line-strong);flex:none}
+.az-passos li.atual{color:var(--ink);font-weight:600}
+.az-passos li.atual::before{border-color:var(--gold);background:var(--gold-soft)}
+.az-passos li.feito{color:var(--ink)}
+.az-passos li.feito::before{border-color:var(--ok);background:var(--ok)}
+.az-passos li small{margin-left:auto;color:var(--muted);font-weight:500}
+.az-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.az-ind{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.az-ind small{display:block;font-size:12px;color:var(--muted);font-weight:500}
+.az-ind b{display:block;font-family:var(--font-display);font-size:16px;font-weight:600;letter-spacing:-.01em;margin-top:3px;overflow-wrap:anywhere}
+.az-ind .nao{font-family:var(--font-body);font-size:12.5px;font-weight:400;color:var(--muted);letter-spacing:0}
+.az-ref{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--steel);background:var(--steel-soft);border:1px solid color-mix(in srgb,var(--steel) 22%,transparent);border-radius:6px;padding:1px 7px;cursor:pointer;margin-left:4px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.az-ref:hover{background:var(--gold-soft);border-color:var(--gold);color:var(--primary)}
+.az-sit{display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:10px;border:1px solid var(--line);border-left:3px solid var(--secondary);background:var(--surface-2);font-weight:500;line-height:1.5}
+.az-niv{display:inline-block;font-size:10.5px;font-weight:600;letter-spacing:.04em;padding:3px 8px;border-radius:6px;white-space:nowrap}
+.az-niv.CRITICO{background:var(--bad);color:#fff}.az-niv.ALTO{background:var(--bad-soft);color:var(--bad)}
+.az-niv.MODERADO{background:var(--warn-soft);color:var(--warn)}.az-niv.INFORMATIVO{background:var(--info-soft);color:var(--info)}
+.az-lado{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+@media (max-width:1000px){.az-lado{grid-template-columns:1fr}}
+.az-pag-img{width:100%;border:1px solid var(--line);border-radius:10px;background:#fff}
+.az-texto{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.5;max-height:70vh;overflow:auto;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px}
+.az-texto mark{background:#F1DFB8;color:#142D3A;border-radius:3px;box-shadow:0 0 0 2px #F1DFB8}
+.az-tl{position:relative;margin:8px 0 0;padding-left:28px}
+.az-tl::before{content:"";position:absolute;left:9px;top:6px;bottom:6px;width:1px;background:var(--line-strong)}
+.az-tl-item{position:relative;padding:12px 14px;margin-bottom:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.az-tl-item::before{content:"";position:absolute;left:-24px;top:16px;width:11px;height:11px;border-radius:50%;background:var(--surface);border:2px solid var(--gold)}
+.az-tl-item.R::before{background:var(--primary);border-color:var(--primary)}
+.az-tl-item b{font-family:var(--font-display);font-weight:600}
+.az-tl-item .muted{display:block}
+.az-tl-item details{margin-top:6px}
+.az-modal{position:fixed;inset:0;background:rgba(13,26,33,.55);z-index:2000;display:flex;align-items:flex-start;justify-content:center;padding:4vh 16px;overflow-y:auto}
+.az-modal>div{background:var(--surface);border-radius:12px;width:min(1200px,100%);padding:20px;box-shadow:var(--shadow-lg)}
 </style>
 </head>
 <body>
-<header><h1>Inteligência Urbana</h1><span>Matrícula · Diretrizes · Zoneamento · Viabilidade · Masterplan · REURB</span></header>
-<nav id="abas">
-  <button data-aba="matricula" class="ativo">Matrícula</button>
-  <button data-aba="diretrizes">Diretrizes (IPPUL)</button>
-  <button data-aba="zoneamento">Zoneamento &amp; vocação</button>
-  <button data-aba="viabilidade">Viabilidade</button>
-  <button data-aba="masterplan">Masterplan</button>
-  <button data-aba="reurb">REURB</button>
-</nav>
-<main>
-<section>
+<div class="app">
+<aside class="side" aria-label="Menu principal">
+  <div class="brand">
+    <div class="brand-mark"><img src="assets/logo-quadrado.png" alt="Inteligência Urbana" width="44" height="44"></div>
+    <div><b>Inteligência Urbana</b><span>Incorporação e urbanismo</span></div>
+  </div>
+  <nav id="abas">
+    <div class="nav-label">Analisador de matrícula</div>
+    <button data-aba="az-dashboard"><i data-lucide="layout-dashboard"></i>Dashboard</button>
+    <button data-aba="az-nova"><i data-lucide="file-plus-2"></i>Nova análise</button>
+    <button data-aba="az-lista"><i data-lucide="files"></i>Matrículas analisadas</button>
+    <button data-aba="az-historico"><i data-lucide="history"></i>Histórico registral</button>
+    <button data-aba="az-onus"><i data-lucide="shield-alert"></i>Ônus e restrições</button>
+    <button data-aba="az-riscos"><i data-lucide="triangle-alert"></i>Análise de riscos</button>
+    <button data-aba="az-relatorios"><i data-lucide="file-text"></i>Relatórios</button>
+    <button data-aba="az-config"><i data-lucide="settings"></i>Configurações</button>
+    <div class="nav-label">Estudo guiado</div>
+    <button data-aba="estudo" class="ativo"><i data-lucide="clipboard-check"></i>Novo estudo</button>
+    <div class="nav-label">Documentos</div>
+    <button data-aba="matricula"><i data-lucide="scroll-text"></i>Matrícula</button>
+    <button data-aba="diretrizes"><i data-lucide="clipboard-list"></i>Diretrizes (IPPUL)</button>
+    <div class="nav-label">Análise</div>
+    <button data-aba="zoneamento"><i data-lucide="layout-grid"></i>Zoneamento</button>
+    <button data-aba="viabilidade"><i data-lucide="chart-line"></i>Viabilidade</button>
+    <button data-aba="masterplan"><i data-lucide="map"></i>Masterplan</button>
+    <button data-aba="reurb"><i data-lucide="house"></i>REURB</button>
+    <div class="nav-label">Mapa</div>
+    <button data-aba="camadas"><i data-lucide="layers"></i>Camadas do mapa</button>
+  </nav>
+  <div class="side-foot">
+    <button id="tema" type="button"><i data-lucide="moon"></i><span id="tema-txt">Tema: automático</span></button>
+    <small>Estudos preliminares — conferir com a legislação vigente.</small>
+  </div>
+</aside>
+<div class="principal">
+  <header class="topbar">
+    <button class="menu-btn" id="menu-btn" aria-label="Abrir menu"><i data-lucide="menu"></i></button>
+    <div><h1 id="titulo">Novo estudo</h1><div class="sub" id="subtitulo"></div></div>
+  </header>
+<main class="trabalho">
+<section class="col-form">
+  <!-- ANALISADOR DE MATRÍCULA -->
+  <div class="painel" id="p-az-dashboard"><div id="az-dash"></div></div>
+  <div class="painel" id="p-az-nova">
+    <div class="card">
+      <h2>Nova análise de matrícula</h2>
+      <p class="muted" style="margin:0">Envie a certidão de inteiro teor em PDF (com texto ou digitalizada) ou as páginas em JPG/PNG.
+        A leitura e o OCR acontecem no seu navegador; o servidor recebe só o texto extraído.</p>
+      <label class="az-drop" id="az-drop">
+        <input type="file" id="az-arq" accept=".pdf,.jpg,.jpeg,.png" multiple hidden>
+        <b>Clique para escolher</b> ou arraste os arquivos aqui<br><span class="muted">PDF (várias páginas) ou imagens JPG/PNG — uma imagem por página, na ordem do nome</span>
+      </label>
+      <div id="az-arqs" class="muted"></div>
+      <button class="btn" id="az-ir" disabled>Iniciar análise</button>
+    </div>
+    <div class="card" id="az-prog-card" hidden><h2>Progresso</h2><ol class="az-passos" id="az-passos"></ol></div>
+  </div>
+  <div class="painel" id="p-az-lista"><div class="card"><h2>Matrículas analisadas</h2>
+    <p class="muted">Salvas somente neste navegador (até a ativação do banco de dados com login).</p><div id="az-lista"></div></div></div>
+  <div class="painel" id="p-az-historico"><div id="az-hist"></div></div>
+  <div class="painel" id="p-az-onus"><div id="az-onus"></div></div>
+  <div class="painel" id="p-az-riscos"><div id="az-riscos"></div></div>
+  <div class="painel" id="p-az-relatorios"><div id="az-rel"></div></div>
+  <div class="painel" id="p-az-config"><div class="card"><h2>Configurações</h2>
+    <table>
+      <tr><th>Armazenamento</th><td>Neste navegador (IndexedDB). Os documentos não são enviados a servidores de terceiros; o servidor do app recebe apenas o texto para análise e não o guarda.</td></tr>
+      <tr><th>OCR</th><td>Tesseract.js (português), executado no navegador. Páginas com confiança abaixo de 70% são sinalizadas.</td></tr>
+      <tr><th>Regra de confiabilidade</th><td>Nenhuma informação é presumida: o que não está no documento aparece como "Não identificado no documento analisado."</td></tr>
+    </table>
+    <button class="btn sec" id="az-limpar">Apagar todas as análises deste navegador</button></div></div>
+
+  <!-- NOVO ESTUDO (passo a passo) -->
+  <div class="painel ativo" id="p-estudo">
+    <div class="card etapa" id="wz-1">
+      <div class="etapa-h"><span class="etapa-n">1</span><div><h2>Matrícula do imóvel</h2><p class="muted">Certidão de inteiro teor (PDF, inclusive escaneada). O sistema lê, analisa e marca o imóvel no mapa.</p></div><span class="etapa-st" id="wz-1-st"></span></div>
+      <div class="etapa-b">
+        <label>PDF da matrícula</label><input type="file" id="wz-mat-arq" accept=".pdf,.txt">
+        <button class="btn" id="wz-mat-ir">Analisar matrícula</button>
+        <div id="wz-mat-res"></div>
+      </div>
+    </div>
+    <div class="card etapa bloqueada" id="wz-2">
+      <div class="etapa-h"><span class="etapa-n">2</span><div><h2>Consulta de Parcelamento do Solo (IPPUL)</h2><p class="muted">Liberada após a matrícula. O croqui do IPPUL é encaixado sobre o imóvel.</p></div><span class="etapa-st" id="wz-2-st"></span></div>
+      <div class="etapa-b">
+        <label>PDF da consulta do IPPUL</label><input type="file" id="wz-dir-arq" accept=".pdf,.txt">
+        <button class="btn" id="wz-dir-ir">Analisar consulta e gerar masterplan</button>
+        <div id="wz-dir-res"></div>
+      </div>
+    </div>
+    <div class="card etapa bloqueada" id="wz-3">
+      <div class="etapa-h"><span class="etapa-n">3</span><div><h2>Masterplan com as diretrizes</h2><p class="muted">Gerado automaticamente com lotes, vias previstas, fundo de vale e áreas públicas demarcados.</p></div><span class="etapa-st" id="wz-3-st"></span></div>
+      <div class="etapa-b"><div id="wz-mp-res"></div></div>
+    </div>
+  </div>
+
   <!-- MATRÍCULA -->
-  <div class="painel ativo" id="p-matricula">
+  <div class="painel" id="p-matricula">
     <div class="card">
       <h2>Análise de matrícula</h2>
       <label>PDF ou TXT da certidão de inteiro teor</label><input type="file" id="mat-arq" accept=".pdf,.txt">
@@ -130,121 +393,800 @@
     </div>
     <div id="re-res"></div>
   </div>
+
+  <!-- CAMADAS -->
+  <div class="painel" id="p-camadas">
+    <div class="card">
+      <h2>Camadas oficiais</h2>
+      <p class="muted">Ligue e desligue no controle do canto superior direito do mapa. Clique no mapa para consultar
+        as camadas ligadas (CAR e hidrografia) e abrir o Street View do ponto.</p>
+      <table id="cam-lista"></table>
+    </div>
+    <div class="card">
+      <h2>Adicionar camada própria</h2>
+      <label>Arquivo KML ou GeoJSON (ex.: parcelas do SIGEF, lotes da prefeitura, levantamento)</label>
+      <input type="file" id="cam-arq" accept=".kml,.geojson,.json">
+      <label>…ou serviço WMS (ex.: geoportal da prefeitura, INCRA)</label>
+      <div class="grade">
+        <div><input id="cam-wms-url" placeholder="https://servidor/geoserver/wms"></div>
+        <div><input id="cam-wms-layer" placeholder="nome da camada"></div>
+      </div>
+      <button class="btn" id="cam-wms-ir">Adicionar WMS</button>
+      <p class="muted" id="cam-status"></p>
+    </div>
+  </div>
 </section>
-<section><div id="mapa"></div></section>
+<section class="col-mapa"><div id="mapa" role="region" aria-label="Mapa"></div></section>
 </main>
+</div>
+</div>
 
 <script>
 const $ = s => document.querySelector(s);
+const icones = () => { try { window.lucide?.createIcons({ attrs: { "stroke-width": 1.75 } }); } catch {} };
+icones();
 const fmt = (v, d = 2) => v == null ? "—" : Number(v).toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d });
 const brl = v => v == null ? "—" : Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const estado = { matricula: null, masterplan: null, schemas: null };
 
 // ---------- abas
+const SUBTITULOS = {
+  "az-dashboard": "Painel da matrícula analisada", "az-nova": "Envie a matrícula: o sistema lê, separa os atos e organiza a história do imóvel",
+  "az-lista": "Análises salvas neste navegador", "az-historico": "Todos os registros e averbações em ordem cronológica",
+  "az-onus": "Existe alguma dívida ou impedimento relacionado ao imóvel?", "az-riscos": "Pontos de atenção encontrados no documento",
+  "az-relatorios": "Relatório técnico da análise", "az-config": "Armazenamento, OCR e regras de confiabilidade",
+  estudo: "Passo a passo: matrícula → consulta do IPPUL → masterplan",
+  matricula: "Certidão de inteiro teor: atos, ônus, memorial descritivo e confrontações",
+  diretrizes: "Consulta prévia e diretrizes de parcelamento do solo",
+  zoneamento: "Parâmetros urbanísticos e vocação da área",
+  viabilidade: "VGV, custos, ROI, TIR e fluxo de caixa",
+  masterplan: "Estudo de massa com lotes, vias, APP e áreas públicas",
+  reurb: "Classificação preliminar pela Lei 13.465/2017",
+  camadas: "Camadas oficiais e camadas próprias no mapa",
+};
 document.querySelectorAll("#abas button").forEach(b => b.onclick = () => {
-  document.querySelectorAll("#abas button").forEach(x => x.classList.toggle("ativo", x === b));
+  document.querySelectorAll("#abas button").forEach(x => { x.classList.toggle("ativo", x === b); x.toggleAttribute("aria-current", x === b); });
   document.querySelectorAll(".painel").forEach(p => p.classList.toggle("ativo", p.id === "p-" + b.dataset.aba));
+  $("#titulo").textContent = b.textContent.trim();
+  $("#subtitulo").textContent = SUBTITULOS[b.dataset.aba] || "";
+  document.body.classList.toggle("sem-mapa", b.dataset.aba.startsWith("az-"));
+  if (b.dataset.aba.startsWith("az-") && typeof azAoAbrir === "function") azAoAbrir(b.dataset.aba);
+  document.body.classList.remove("nav-aberta");
   setTimeout(() => mapa.invalidateSize(), 50);
 });
+$("#subtitulo").textContent = SUBTITULOS.estudo;
+$("#menu-btn").onclick = () => document.body.classList.toggle("nav-aberta");
+document.body.addEventListener("click", e => { if (document.body.classList.contains("nav-aberta") && !e.target.closest(".side, #menu-btn")) document.body.classList.remove("nav-aberta"); });
+const corMapa = () => getComputedStyle(document.documentElement).getPropertyValue("--accent-map").trim() || "#C6A66B";
+
+// tema claro / escuro / automático (preferência só deste navegador)
+const TEMAS = [["", "automático"], ["light", "claro"], ["dark", "escuro"]];
+function aplicarTema(v) {
+  if (v) document.documentElement.dataset.theme = v; else delete document.documentElement.dataset.theme;
+  $("#tema-txt").textContent = "Tema: " + TEMAS.find(t => t[0] === v)[1];
+}
+let temaAtual = ""; try { temaAtual = localStorage.getItem("iu-tema") || ""; } catch {}
+aplicarTema(temaAtual);
+$("#tema").onclick = () => {
+  temaAtual = TEMAS[(TEMAS.findIndex(t => t[0] === temaAtual) + 1) % TEMAS.length][0];
+  aplicarTema(temaAtual); try { localStorage.setItem("iu-tema", temaAtual); } catch {}
+};
 
 // ---------- mapa
-const mapa = L.map("mapa").setView([-23.31, -51.16], 12);
-const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 20, attribution: "Esri World Imagery" });
-const osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" });
-sat.addTo(mapa);
-L.control.layers({ "Satélite": sat, "Mapa": osm }).addTo(mapa);
-let camadaMat = L.layerGroup().addTo(mapa), camadaMp = L.layerGroup().addTo(mapa);
+const mapa = L.map("mapa", { maxZoom: 21 }).setView([-23.31, -51.16], 12);
+const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/";
+const sat = L.tileLayer(ESRI + "World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 21, maxNativeZoom: 19, attribution: "Esri World Imagery" });
+const osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 21, maxNativeZoom: 19, attribution: "© OpenStreetMap" });
+const rotulos = L.tileLayer(ESRI + "Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", { maxZoom: 21, maxNativeZoom: 19, attribution: "Esri" });
+const ruas = L.tileLayer(ESRI + "Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}", { maxZoom: 21, maxNativeZoom: 19, attribution: "Esri" });
+sat.addTo(mapa); rotulos.addTo(mapa);
+const controleCamadas = L.control.layers({ "Satélite": sat, "Mapa (OpenStreetMap)": osm }, { "Nomes e limites": rotulos, "Ruas e rodovias": ruas }).addTo(mapa);
+L.control.scale({ imperial: false }).addTo(mapa);
+let camadaMat = L.layerGroup().addTo(mapa), camadaMp = L.layerGroup().addTo(mapa), camadaCruz = L.layerGroup().addTo(mapa);
+const CAM = {}; // camadas oficiais por id (config vinda da API)
+
+const linksGoogle = (lat, lng) =>
+  `<a target="_blank" rel="noopener" href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}">Street View</a> · ` +
+  `<a target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${lat},${lng}">Google Maps</a> · ` +
+  `<a target="_blank" rel="noopener" href="https://earth.google.com/web/@${lat},${lng},600a,800d,35y,0h,0t,0r">Google Earth</a>`;
+
+const ROTULOS_PROPS = { cod_imovel: "Código CAR", municipio: "Município", area: "Área (ha)", condicao: "Condição", status_imovel: "Status",
+  tipo_imovel: "Tipo", m_fiscal: "Módulos fiscais", dat_criacao: "Inscrição", nome: "Nome", regime: "Regime", tipotrechodrenagem: "Tipo" };
+function tabelaProps(props) {
+  const linhas = Object.entries(props || {}).filter(([k, v]) => v != null && v !== "" && (ROTULOS_PROPS[k] || Object.keys(props).length <= 8))
+    .map(([k, v]) => `<tr><th>${esc(ROTULOS_PROPS[k] || k)}</th><td>${esc(k === "dat_criacao" ? String(v).slice(0, 10) : v)}</td></tr>`).join("");
+  return `<table style="margin-top:4px">${linhas}</table>`;
+}
+
+async function carregarCamadasOficiais() {
+  const { wms } = await (await api("api/camadas")).json();
+  wms.forEach(c => {
+    const l = L.tileLayer.wms(c.url, { layers: c.layers, format: "image/png", transparent: true, opacity: c.opacidade, maxZoom: 21, attribution: c.fonte });
+    l._cfg = c; CAM[c.id] = c;
+    controleCamadas.addOverlay(l, c.nome);
+  });
+  $("#cam-lista").innerHTML = "<tr><th>Camada</th><th>Fonte</th><th>Escala</th></tr>" +
+    wms.map(c => `<tr><td>${esc(c.nome)}</td><td>${esc(c.fonte)}</td><td>${esc(c.escala)}</td></tr>`).join("");
+}
+
+// Consulta por clique: GetFeatureInfo direto do navegador (os serviços liberam CORS)
+async function infoWMS(cfg, latlng) {
+  const crs = L.CRS.EPSG3857, b = mapa.getBounds(), s = mapa.getSize(), p = mapa.latLngToContainerPoint(latlng);
+  const sw = crs.project(b.getSouthWest()), ne = crs.project(b.getNorthEast());
+  const q = new URLSearchParams({ service: "WMS", version: "1.1.1", request: "GetFeatureInfo", layers: cfg.layers, query_layers: cfg.layers,
+    styles: "", srs: "EPSG:3857", bbox: [sw.x, sw.y, ne.x, ne.y].join(","), width: s.x, height: s.y, x: Math.round(p.x), y: Math.round(p.y),
+    info_format: "application/json", feature_count: 5 });
+  const r = await fetch(cfg.url + "?" + q);
+  if (!r.ok) { let m = `${cfg.fonte} não respondeu (${r.status})`; try { m = (await r.json()).detail || m; } catch {} throw new Error(m); }
+  const d = await r.json();
+  return d.features?.length ? `<div style="margin-top:8px"><b>${esc(cfg.nome)}</b>${d.features.map(f => tabelaProps(f.properties)).join("")}</div>` : "";
+}
+mapa.on("click", async ev => {
+  if (estado.desenho) return adicionarPonto(ev.latlng);
+  const { lat, lng } = ev.latlng;
+  let html = `<b>${lat.toFixed(6)}, ${lng.toFixed(6)}</b><br>${linksGoogle(lat.toFixed(6), lng.toFixed(6))}`;
+  const ativas = [];
+  mapa.eachLayer(l => { if (l._cfg?.consultavel) ativas.push(l._cfg); });
+  const popup = L.popup({ maxWidth: 360 }).setLatLng(ev.latlng).setContent(html + (ativas.length ? `<div class="muted">consultando ${ativas.length} camada(s)…</div>` : "")).openOn(mapa);
+  if (!ativas.length) return;
+  const res = await Promise.allSettled(ativas.map(c => infoWMS(c, ev.latlng)));
+  res.forEach(r => html += r.status === "fulfilled" ? r.value : `<div class="alerta">${esc(r.reason.message)}</div>`);
+  popup.setContent(html);
+});
+
+// WFS direto do navegador; bbox [lonMin, latMin, lonMax, latMax]
+async function wfsNavegador(url, camada, bbox, limite = 500) {
+  const q = new URLSearchParams({ service: "WFS", version: "2.0.0", request: "GetFeature", typeNames: camada, outputFormat: "application/json",
+    srsName: "EPSG:4326", count: limite, bbox: `${bbox[1]},${bbox[0]},${bbox[3]},${bbox[2]},urn:ogc:def:crs:EPSG::4326` });
+  const r = await fetch(url + "?" + q);
+  if (!r.ok) { let m = `Serviço respondeu ${r.status}`; try { m = (await r.json()).detail || m; } catch {} throw new Error(m); }
+  return (await r.json()).features || [];
+}
+function bboxMatricula(margemM) {
+  const cs = estado.matricula.geojson.geometry.coordinates[0], d = margemM / 111000;
+  const lons = cs.map(c => c[0]), lats = cs.map(c => c[1]);
+  return [Math.min(...lons) - d, Math.min(...lats) - d, Math.max(...lons) + d, Math.max(...lats) + d];
+}
+function centroMatricula() {
+  const cs = estado.matricula.geojson.geometry.coordinates[0].slice(0, -1);
+  return [cs.reduce((a, c) => a + c[1], 0) / cs.length, cs.reduce((a, c) => a + c[0], 0) / cs.length].map(v => v.toFixed(6));
+}
+const postJSON = async (url, body) => (await api(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
+
+async function cruzarCAR() {
+  const r = estado.matricula, alvo = "#mat-cruz";
+  $(alvo).innerHTML = `<div class="card"><p class="muted">Consultando o SICAR…</p></div>`;
+  try {
+    const feicoes = await wfsNavegador(CAM.car.wfs, CAM.car.layers, bboxMatricula(50));
+    const d = await postJSON("api/camadas/car-sobreposicao", { vertices_utm: r.vertices.map(v => [v.e, v.n]), epsg: r.epsg, feicoes });
+    camadaCruz.clearLayers();
+    L.geoJSON({ type: "FeatureCollection", features: d.features }, { style: { color: "#b23cfd", weight: 2, dashArray: "6 4", fillOpacity: .12 },
+      onEachFeature: (f, l) => l.bindPopup(`<b>CAR</b>${tabelaProps(f.properties)}`) }).addTo(camadaCruz);
+    $(alvo).innerHTML = `<div class="card"><h2>CAR sobrepostos à matrícula</h2>${alertasHTML(d.alertas)}
+      <table><tr><th>Código</th><th>Sobreposição</th><th>% matrícula</th><th>% do CAR</th><th>Condição</th></tr>
+      ${d.sobreposicoes.map(s => `<tr><td>${esc(s.cod_imovel)}</td><td>${fmt(s.area_sobreposta_m2, 0)} m²</td><td>${fmt(s.pct_da_matricula, 1)}%</td><td>${fmt(s.pct_do_car, 1)}%</td><td>${esc(s.condicao || s.status || "—")}</td></tr>`).join("")}</table>
+      <p class="muted">${esc(d.fonte)}</p></div>`;
+  } catch (e) { erro(alvo, e); }
+}
+
+async function buscarDrenagem() {
+  const r = estado.matricula, alvo = "#mat-cruz", raio = 300;
+  $(alvo).innerHTML = `<div class="card"><p class="muted">Consultando a hidrografia do IBGE…</p></div>`;
+  try {
+    const feicoes = await wfsNavegador(CAM.drenagem.wfs, CAM.drenagem.layers, bboxMatricula(raio));
+    const d = await postJSON("api/camadas/drenagem", { vertices_utm: r.vertices.map(v => [v.e, v.n]), epsg: r.epsg, raio_m: raio, feicoes });
+    camadaCruz.clearLayers();
+    L.geoJSON({ type: "FeatureCollection", features: d.features }, { style: { color: "#1e88ff", weight: 4 },
+      onEachFeature: (f, l) => l.bindTooltip(`${esc(f.properties.nome)} — ${fmt(f.properties.distancia_m, 0)} m`) }).addTo(camadaCruz);
+    $(alvo).innerHTML = `<div class="card"><h2>Cursos d'água até ${raio} m do imóvel</h2>${alertasHTML(d.alertas)}
+      <table><tr><th>Curso d'água</th><th>Distância</th><th>Corta o imóvel?</th><th>Extensão no imóvel</th></tr>
+      ${d.cursos.map(c => `<tr><td>${esc(c.nome)}</td><td>${fmt(c.distancia_m, 0)} m</td><td>${c.corta_o_imovel ? "sim" : "não"}</td><td>${fmt(c.extensao_no_imovel_m, 0)} m</td></tr>`).join("") || "<tr><td colspan=4>Nenhum curso d'água mapeado no raio.</td></tr>"}</table>
+      ${d.cursos.length ? `<button class="btn sec" id="dren-mp">Usar no masterplan (APP automática)</button>` : ""}<p class="muted">${esc(d.fonte)}</p></div>`;
+    if (d.cursos.length) $("#dren-mp").onclick = () => {
+      estado.cursos = d.cursos.flatMap(c => c.linhas_utm);
+      document.querySelector('[data-aba="masterplan"]').click(); atualizarOrigemMp();
+    };
+  } catch (e) { erro(alvo, e); }
+}
+
+// Camadas do usuário: KML / GeoJSON / WMS
+function kmlParaGeoJSON(texto) {
+  const doc = new DOMParser().parseFromString(texto, "application/xml"), feats = [];
+  const coords = el => el.textContent.trim().split(/\s+/).map(t => t.split(",").slice(0, 2).map(Number));
+  doc.querySelectorAll("Placemark").forEach(pm => {
+    const nome = pm.querySelector("name")?.textContent || "";
+    pm.querySelectorAll("Polygon").forEach(pg => {
+      const aneis = [pg.querySelector("outerBoundaryIs coordinates"), ...pg.querySelectorAll("innerBoundaryIs coordinates")].filter(Boolean).map(coords);
+      feats.push({ type: "Feature", properties: { nome }, geometry: { type: "Polygon", coordinates: aneis } });
+    });
+    pm.querySelectorAll("LineString").forEach(ls => feats.push({ type: "Feature", properties: { nome }, geometry: { type: "LineString", coordinates: coords(ls.querySelector("coordinates")) } }));
+    pm.querySelectorAll("Point").forEach(pt => feats.push({ type: "Feature", properties: { nome }, geometry: { type: "Point", coordinates: coords(pt.querySelector("coordinates"))[0] } }));
+  });
+  return { type: "FeatureCollection", features: feats };
+}
+$("#cam-arq").onchange = async ev => {
+  const arq = ev.target.files[0]; if (!arq) return;
+  try {
+    const txt = await arq.text();
+    const gj = arq.name.toLowerCase().endsWith(".kml") ? kmlParaGeoJSON(txt) : JSON.parse(txt);
+    const l = L.geoJSON(gj, { style: { color: "#00e5ff", weight: 2, fillOpacity: .1 }, onEachFeature: (f, ly) => ly.bindPopup(tabelaProps(f.properties)) }).addTo(mapa);
+    controleCamadas.addOverlay(l, esc(arq.name));
+    mapa.fitBounds(l.getBounds());
+    $("#cam-status").textContent = `${arq.name}: ${(gj.features || []).length} feições adicionadas.`;
+  } catch (e) { $("#cam-status").textContent = "Não foi possível ler o arquivo: " + e.message; }
+};
+$("#cam-wms-ir").onclick = () => {
+  const url = $("#cam-wms-url").value.trim(), camada = $("#cam-wms-layer").value.trim();
+  if (!/^https:\/\//.test(url) || !camada) return $("#cam-status").textContent = "Informe a URL https:// do WMS e o nome da camada.";
+  const l = L.tileLayer.wms(url, { layers: camada, format: "image/png", transparent: true, maxZoom: 21 }).addTo(mapa);
+  controleCamadas.addOverlay(l, esc(camada));
+  $("#cam-status").textContent = `Camada WMS "${camada}" adicionada.`;
+};
 const CORES = { lote: "#f6d58e", via: "#bdbdbd", area_verde: "#7cc576", institucional: "#f2a65a", app: "#2e7d32", remanescente: "#e0e0e0" };
 
+const ERROS_HTTP = {
+  413: "Arquivo grande demais para envio ao servidor (limite de 4,5 MB).",
+  500: "Erro interno no servidor ao processar o pedido.",
+  502: "Um serviço externo não respondeu.",
+  504: "O servidor demorou demais para responder. Tente novamente.",
+};
 async function api(url, opts = {}) {
-  const r = await fetch(url, opts);
-  if (!r.ok) { let m = r.statusText; try { const j = await r.json(); m = typeof j.detail === "string" ? j.detail : (j.detail || []).map(d => `${d.loc.slice(-1)[0]}: ${d.type === "missing" ? "campo obrigatório" : d.msg}`).join("; "); } catch {} throw new Error(m); }
+  let r;
+  try { r = await fetch(url, opts); } catch (e) { throw new Error("Sem conexão com o servidor. Verifique a internet e tente de novo."); }
+  if (!r.ok) {
+    const corpo = await r.text();
+    let m = "";
+    try {
+      const j = JSON.parse(corpo);
+      m = typeof j.detail === "string" ? j.detail : (j.detail || []).map(d => `${rotuloCampo(String(d.loc.slice(-1)[0]))}: ${d.type === "missing" ? "campo obrigatório" : d.msg}`).join("; ");
+    } catch {}
+    if (!m) m = `${ERROS_HTTP[r.status] || "Falha na requisição."} (código ${r.status}${corpo ? " — " + corpo.slice(0, 120).replace(/\s+/g, " ") : ""})`;
+    throw new Error(m);
+  }
   return r;
 }
+
+// Leitura de PDF no navegador (pdf.js): envia só o texto ao servidor, sem limite de tamanho do arquivo
+const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+let pdfjsPromessa = null;
+function carregarPdfJs() {
+  if (!pdfjsPromessa) pdfjsPromessa = new Promise((ok, falha) => {
+    const sc = document.createElement("script");
+    sc.src = PDFJS + "pdf.min.js";
+    sc.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + "pdf.worker.min.js"; ok(window.pdfjsLib); };
+    sc.onerror = () => { pdfjsPromessa = null; falha(new Error("Não foi possível carregar o leitor de PDF. Verifique a internet.")); };
+    document.head.appendChild(sc);
+  });
+  return pdfjsPromessa;
+}
+// OCR no navegador (Tesseract.js) para certidões escaneadas
+const TESS = {
+  script: "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js",
+  workerPath: "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js",
+  corePath: "https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1",
+  langPath: "https://cdn.jsdelivr.net/npm/@tesseract.js-data/por@1.0.0/4.0.0_best_int",
+};
+let tessPromessa = null;
+function carregarScript(src) {
+  return new Promise((ok, falha) => {
+    const sc = document.createElement("script");
+    sc.src = src; sc.onload = ok; sc.onerror = () => falha(new Error("Não foi possível carregar o leitor de OCR. Verifique a internet."));
+    document.head.appendChild(sc);
+  });
+}
+async function workerOCR(aviso) {
+  workerOCR.aviso = aviso;
+  if (!tessPromessa) tessPromessa = (async () => {
+    await carregarScript(TESS.script);
+    aviso("Preparando o reconhecimento de texto (OCR)… na primeira vez pode levar alguns segundos.");
+    const w = await Tesseract.createWorker("por", 1, { workerPath: TESS.workerPath, corePath: TESS.corePath, langPath: TESS.langPath,
+      logger: m => { if (m.status === "recognizing text" && workerOCR.pagina) workerOCR.aviso(`Reconhecendo texto (OCR) — página ${workerOCR.pagina}: ${Math.round(m.progress * 100)}%`); } });
+    await w.setParameters({ tessedit_pageseg_mode: "4" });
+    return w;
+  })().catch(e => { tessPromessa = null; throw e; });
+  return tessPromessa;
+}
+// linhas do carimbo de autenticidade das certidões digitais não contam como conteúdo
+const CARIMBO = /consultar\s+a\s+autenticidade|aripar\.org|e-validador|c[óo]digo\s+de\s+verifica|consulta\s+dispon[íi]vel|^\s*p[áa]gina|valide\s+aqui|^\s*este\s+documento\s*$|sptth|rb\.gro/i;
+const conteudoUtil = t => t.split("\n").filter(l => l.trim().length > 10 && !CARIMBO.test(l)).join("").replace(/\s/g, "").length;
+
+async function textoDoArquivo(arq, aviso) {
+  if (!/\.pdf$/i.test(arq.name) && arq.type !== "application/pdf") return { texto: await arq.text(), ocr: 0 };
+  const lib = await carregarPdfJs();
+  const pdf = await lib.getDocument({ data: await arq.arrayBuffer() }).promise;
+  const paginas = []; let ocr = 0;
+  for (let i = 1; i <= pdf.numPages; i++) {
+    aviso(`Lendo o PDF: página ${i} de ${pdf.numPages}…`);
+    const pagina = await pdf.getPage(i);
+    const c = await pagina.getTextContent();
+    let texto = c.items.map(it => it.str + (it.hasEOL ? "\n" : " ")).join("");
+    if (conteudoUtil(texto) < 200) {  // página escaneada: renderiza em ~300 dpi e faz OCR
+      const w = await workerOCR(aviso);
+      workerOCR.pagina = `${i} de ${pdf.numPages}`;
+      aviso(`Reconhecendo texto (OCR) — página ${workerOCR.pagina}…`);
+      const vp = pagina.getViewport({ scale: 4 });
+      const canvas = document.createElement("canvas");
+      canvas.width = vp.width; canvas.height = vp.height;
+      await pagina.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
+      texto = (await w.recognize(canvas)).data.text;
+      canvas.width = canvas.height = 0; ocr++;
+    }
+    paginas.push(texto);
+  }
+  const texto = paginas.join("\n");
+  if (conteudoUtil(texto) < 50)
+    throw new Error("Não foi possível ler texto neste PDF, nem por OCR. Copie o texto da certidão e cole no campo \"…ou cole o texto\".");
+  return { texto, ocr };
+}
+const carregando = (alvo, txt) => { $(alvo).innerHTML = `<div class="card"><p class="muted">${esc(txt)}</p></div>`; };
 function erro(alvo, e) { $(alvo).innerHTML = `<div class="card"><div class="alerta">${esc(e.message || e)}</div></div>`; }
 function baixar(blob, nome) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = nome; a.click(); }
 const alertasHTML = l => (l || []).map(a => `<div class="alerta">${esc(a)}</div>`).join("");
 
 // ---------- matrícula
-$("#mat-ir").onclick = async () => {
+async function analisarMatricula({ arq, texto, epsg, aviso }) {
+  const lido = arq ? await textoDoArquivo(arq, aviso) : { texto: texto || "", ocr: 0 };
+  if (!lido.texto.trim()) throw new Error("Escolha um arquivo ou cole o texto da matrícula.");
+  if (arq) $("#mat-txt").value = lido.texto;
   const fd = new FormData();
-  if ($("#mat-arq").files[0]) fd.append("arquivo", $("#mat-arq").files[0]); else fd.append("texto", $("#mat-txt").value);
-  if ($("#mat-epsg").value) fd.append("epsg", $("#mat-epsg").value);
-  try {
-    const r = await (await api("/api/matricula/analisar", { method: "POST", body: fd })).json();
-    estado.matricula = r; renderMatricula(r);
-  } catch (e) { erro("#mat-res", e); }
+  fd.append("texto", lido.texto);
+  if (epsg) fd.append("epsg", epsg);
+  aviso("Analisando a matrícula…");
+  const r = await (await api("api/matricula/analisar", { method: "POST", body: fd })).json();
+  estado.matricula = r; estado.masterplan = null; camadaMp.clearLayers();
+  renderMatricula(r);
+  return r;
+}
+$("#mat-ir").onclick = async () => {
+  try { await analisarMatricula({ arq: $("#mat-arq").files[0], texto: $("#mat-txt").value, epsg: $("#mat-epsg").value, aviso: t => carregando("#mat-res", t) }); }
+  catch (e) { erro("#mat-res", e); }
 };
 
 function renderMatricula(r) {
-  const id = [["Matrícula", r.numero], ["Cartório", r.cartorio], ["Comarca", r.comarca], ["Tipo", r.tipo_imovel], ["Lote/Quadra", [r.lote, r.quadra].filter(Boolean).join(" / ")],
-    ["Loteamento", r.loteamento], ["Inscrição", r.inscricao_imobiliaria], ["CCIR", r.ccir], ["CAR", r.car], ["Datum", r.datum || "não declarado"]]
+  const id = [["Matrícula", r.numero], ["Cartório", r.cartorio], ["Comarca", r.comarca], ["Tipo", r.tipo_imovel],
+    ["Endereço", [r.endereco, r.cep && "CEP " + r.cep].filter(Boolean).join(" — ")],
+    ["Lote (data) / Quadra", [r.lote, r.quadra].filter(Boolean).join(" / ")], ["Loteamento", r.loteamento],
+    ["Inscrição imobiliária", r.inscricao_imobiliaria], ["CCIR", r.ccir], ["CAR", r.car],
+    ["Datum", r.vertices.length ? (r.datum || "não declarado") : null], ["Último ato (certidão)", r.ultimo_ato_certificado]]
     .filter(x => x[1]).map(([k, v]) => `<tr><th>${k}</th><td>${esc(v)}</td></tr>`).join("");
-  const atos = r.atos.map(a => `<tr><td>${a.tipo}-${a.numero}</td><td>${a.categorias.map(c => `<span class="tag ${a.onus ? "onus" : ""}">${esc(c)}</span>`).join("")}${a.situacao ? `<div class="muted">${esc(a.situacao)}</div>` : ""}</td></tr>`).join("");
+  const atos = r.atos.map(a => `<tr><td style="white-space:nowrap">${a.tipo}-${a.numero}</td><td>${a.categorias.map(c => `<span class="tag ${a.onus ? "onus" : ""}">${esc(c)}</span>`).join("")}${a.situacao ? `<div class="muted">${esc(a.situacao)}</div>` : ""}</td></tr>`).join("");
   const verts = r.vertices.map(v => `<tr><td>${esc(v.nome)}</td><td>${fmt(v.e, 3)}</td><td>${fmt(v.n, 3)}</td></tr>`).join("");
   const segs = r.segmentos.map(s => `<tr><td>${esc(s.de)}→${esc(s.para)}</td><td>${fmt(s.azimute_graus, 4)}°</td><td>${fmt(s.distancia_m)}</td><td>${esc(s.confrontante || "—")}</td></tr>`).join("");
+  const u = r.unidade_autonoma;
+  const unidade = u ? `<div class="card"><h2>Unidade autônoma${u.edificio ? " — " + esc(u.edificio) : ""}</h2>
+      <div class="kpis">
+        <div class="kpi"><small>Unidade</small><b>${esc(u.unidade || "—")}</b></div>
+        <div class="kpi"><small>Área total</small><b>${fmt(u.area_total_m2)} m²</b></div>
+        <div class="kpi"><small>Área privativa</small><b>${fmt(u.area_privativa_m2)} m²</b></div>
+        <div class="kpi"><small>Fração ideal do terreno</small><b>${fmt(u.fracao_ideal_terreno_m2)} m²</b></div>
+        <div class="kpi"><small>Participação</small><b>${fmt(u.participacao_condominio_pct)}%</b></div>
+        <div class="kpi"><small>Terreno do condomínio</small><b>${fmt(u.area_terreno_condominio_m2)} m²</b></div>
+      </div>${u.vagas ? `<p class="muted">Vaga(s) de garagem nº ${u.vagas.map(esc).join(", ")}</p>` : ""}</div>` : "";
+  const transm = r.transmissoes.length ? `<div class="card"><h2>Cadeia de transmissões</h2><table>
+      <tr><th>Ato</th><th>Natureza</th><th>Adquirente(s)</th><th>Fração</th><th>Valor</th></tr>
+      ${r.transmissoes.map(t => `<tr><td>${t.ato}</td><td>${esc(t.natureza)}</td><td>${t.adquirentes.map(esc).join("<br>") || "—"}</td><td>${t.fracao_pct ? fmt(t.fracao_pct, 0) + "%" : "100%"}</td><td>${brl(t.valor)}</td></tr>`).join("")}
+    </table><p class="muted">Confirme a titularidade atual na certidão; frações e cônjuges podem alterar a composição.</p></div>` : "";
+  const temMemorial = r.vertices.length || r.segmentos.length || r.medidas.length;
   $("#mat-res").innerHTML = `
     <div class="card"><h2>Resumo</h2>
       <div class="kpis">
         <div class="kpi"><small>Área declarada</small><b>${fmt(r.area_declarada_m2)} m²</b></div>
-        <div class="kpi"><small>Área calculada</small><b>${fmt(r.area_calculada_m2)} m²</b></div>
-        <div class="kpi"><small>Perímetro</small><b>${fmt(r.perimetro_m)} m</b></div>
+        ${r.area_calculada_m2 != null ? `<div class="kpi"><small>Área calculada</small><b>${fmt(r.area_calculada_m2)} m²</b></div>
+        <div class="kpi"><small>Perímetro</small><b>${fmt(r.perimetro_m)} m</b></div>` : ""}
+        <div class="kpi"><small>Atos</small><b>${r.atos.length}</b></div>
         <div class="kpi"><small>Ônus ativos</small><b>${r.atos.filter(a => a.onus && a.situacao.startsWith("ativo")).length}</b></div>
       </div>
       ${alertasHTML(r.alertas)}
       <table style="margin-top:8px">${id}</table>
-      ${r.geojson ? `<button class="btn" id="mat-kml">Baixar KML (Google Earth)</button><button class="btn sec" id="mat-kmz">KMZ</button><button class="btn sec" id="mat-mp">Usar no masterplan</button>` : ""}
+      ${r.geojson ? `<button class="btn" id="mat-kml">Baixar KML (Google Earth)</button><button class="btn sec" id="mat-kmz">KMZ</button><button class="btn sec" id="mat-mp">Usar no masterplan</button>
+        <div style="margin-top:4px"><button class="btn sec" id="mat-sv">Street View</button><button class="btn sec" id="mat-car">CAR sobrepostos</button><button class="btn sec" id="mat-dren">Córregos próximos (IBGE)</button></div>${controlesPosicao(r)}`
+        : `<div id="mat-local" style="margin-top:14px"></div>`}
     </div>
+    <div id="mat-cruz"></div>
+    ${unidade}
+    ${transm}
     <div class="card"><h2>Atos registrais (${r.atos.length})</h2><table>${atos || "<tr><td>Nenhum ato identificado</td></tr>"}</table></div>
-    <div class="card"><h2>Memorial descritivo</h2>
-      <details ${verts ? "open" : ""}><summary>Vértices (${r.vertices.length})</summary><table><tr><th>Vértice</th><th>E</th><th>N</th></tr>${verts}</table></details>
-      <details open><summary>Confrontações (${r.segmentos.length})</summary><table><tr><th>Lance</th><th>Azimute</th><th>Dist. (m)</th><th>Confrontante</th></tr>${segs}</table></details>
-      ${r.medidas.length ? `<details open><summary>Medidas lineares</summary><table>${r.medidas.map(m => `<tr><td>${esc(m.lado)}</td><td>${fmt(m.medida_m)} m</td><td>${esc(m.confrontacao)}</td></tr>`).join("")}</table></details>` : ""}
-    </div>`;
-  camadaMat.clearLayers();
+    ${temMemorial ? `<div class="card"><h2>Divisas e confrontações</h2>
+      ${r.vertices.length ? `<details open><summary>Vértices (${r.vertices.length})</summary><table><tr><th>Vértice</th><th>E</th><th>N</th></tr>${verts}</table></details>` : ""}
+      ${r.segmentos.length ? `<details open><summary>Lances (${r.segmentos.length})</summary><table><tr><th>Lance</th><th>Azimute</th><th>Dist. (m)</th><th>Confrontante</th></tr>${segs}</table></details>` : ""}
+      ${r.medidas.length ? `<table>${r.medidas.map(m => `<tr><th>${esc(m.lado)}</th><td>${m.medida_m != null ? fmt(m.medida_m) + " m" : ""}</td><td>${esc(m.confrontacao)}</td></tr>`).join("")}</table>` : ""}
+    </div>` : ""}`;
+  if ($("#wz-ajuste")) $("#wz-ajuste").innerHTML = r.posicao ? controlesPosicao(r) : "";
+  wzAtualizar();
+  if (r.diretrizes && $("#dir-ajuste")) {
+    $("#dir-ajuste").innerHTML = r.posicao
+      ? (r.croqui ? `<div class="alerta" style="border-left-color:var(--info);background:var(--info-soft);margin-top:12px">O documento não traz coordenadas: alinhe o croqui arrastando o marcador ✥ até o córrego, a ferrovia e as quadras coincidirem com o satélite.</div>` : "") + controlesPosicao(r)
+      : r.geojson ? `<p class="muted" style="margin-top:10px">Croqui encaixado sobre o polígono da matrícula analisada.</p>`
+      : `<p class="muted" style="margin-top:10px">Localizando… se não for possível, contorne a área na aba <b>Matrícula</b>.</p>`;
+  }
+  camadaMat.clearLayers(); camadaCruz.clearLayers(); estado.cursos = null;
   if (r.geojson) {
-    const g = L.geoJSON(r.geojson, { style: { color: "#ff7a00", weight: 3, fillOpacity: .15 } }).addTo(camadaMat);
-    r.geojson.geometry.coordinates[0].slice(0, -1).forEach((c, i) => L.circleMarker([c[1], c[0]], { radius: 4, color: "#fff", fillColor: "#ff7a00", fillOpacity: 1 })
+    desenharCroqui(r, camadaMat);
+    const g = L.geoJSON(r.geojson, { style: { color: corMapa(), weight: 3, fillOpacity: .15 } }).addTo(camadaMat);
+    r.geojson.geometry.coordinates[0].slice(0, -1).forEach((c, i) => L.circleMarker([c[1], c[0]], { radius: 4, color: "#fff", fillColor: corMapa(), fillOpacity: 1 })
       .bindTooltip(r.vertices[i]?.nome || "").addTo(camadaMat));
-    mapa.fitBounds(g.getBounds(), { padding: [30, 30] });
+    mapa.fitBounds(g.getBounds(), { padding: [40, 40], maxZoom: 19 });
+    desenharMedidas(r.geojson.geometry.coordinates[0].slice(0, -1).map(c => [c[1], c[0]]), r.area_calculada_m2, camadaMat,
+      r.segmentos.length === r.vertices.length ? r.segmentos.map(sg => sg.distancia_m) : null);
     const kml = async kmz => {
       const corpo = { nome: `Matrícula ${r.numero || ""}`.trim(), epsg: r.epsg, vertices: r.vertices, segmentos: r.segmentos, kmz,
         info: { "Matrícula": r.numero || "—", "Área declarada (m²)": fmt(r.area_declarada_m2), "Área calculada (m²)": fmt(r.area_calculada_m2), "Perímetro (m)": fmt(r.perimetro_m) } };
-      const resp = await api("/api/geo/kml", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
+      const resp = await api("api/geo/kml", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
       baixar(await resp.blob(), `matricula_${r.numero || "imovel"}.${kmz ? "kmz" : "kml"}`);
     };
     $("#mat-kml").onclick = () => kml(false); $("#mat-kmz").onclick = () => kml(true);
     $("#mat-mp").onclick = () => { document.querySelector('[data-aba="masterplan"]').click(); atualizarOrigemMp(); };
+    $("#mat-sv").onclick = () => { const [la, lo] = centroMatricula(); window.open(`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${la},${lo}`, "_blank", "noopener"); };
+    $("#mat-car").onclick = cruzarCAR;
+    $("#mat-dren").onclick = buscarDrenagem;
+    ligarControlesPosicao(r);
     $("#zon-area").value = Math.round(r.area_calculada_m2 || r.area_declarada_m2 || 0);
+  } else {
+    iniciarLocalizacao(r);
   }
 }
 
-// ---------- diretrizes
-$("#dir-ir").onclick = async () => {
-  const fd = new FormData();
-  if ($("#dir-arq").files[0]) fd.append("arquivo", $("#dir-arq").files[0]); else fd.append("texto", $("#dir-txt").value);
+// ---------- medidas no mapa (comprimento de cada lado e área)
+function distanciaM(a, b) { return mapa.distance(a, b); }
+function desenharMedidas(pts, area, camada, comprimentos = null) {
+  pts.forEach((p, i) => {
+    const q = pts[(i + 1) % pts.length];
+    if (pts.length < 3 && i === pts.length - 1) return;
+    const meio = L.latLng((p.lat ?? p[0]) / 2 + (q.lat ?? q[0]) / 2, (p.lng ?? p[1]) / 2 + (q.lng ?? q[1]) / 2);
+    L.tooltip({ permanent: true, direction: "center", className: "medida" }).setLatLng(meio)
+      .setContent(`${fmt(comprimentos?.[i] ?? distanciaM(L.latLng(p), L.latLng(q)))} m`).addTo(camada);
+  });
+  if (area && pts.length >= 3) {
+    const centro = L.polygon(pts).getBounds().getCenter();
+    L.tooltip({ permanent: true, direction: "center", className: "medida medida-area", offset: [0, -26] }).setLatLng(centro).setContent(`${fmt(area)} m²`).addTo(camada);
+  }
+}
+
+// ---------- localização pelo endereço (OpenStreetMap/Nominatim) e contorno manual
+const areaReferencia = r => r.unidade_autonoma?.area_terreno_condominio_m2 || r.area_declarada_m2 || null;
+async function geocodificar(r) {
+  const base = "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=br&accept-language=pt-BR&";
+  const cidade = (r.comarca || "Londrina").replace(/\b\w/g, c => c.toUpperCase()).replace(/\B\w/g, c => c.toLowerCase());
+  const rua = r.endereco ? r.endereco.replace(/\s+nº\s*/, " ") : null;
+  const tentativas = [];
+  if (r.cep) tentativas.push(["CEP " + r.cep, `postalcode=${encodeURIComponent(r.cep.replace(".", ""))}`]);
+  if (rua) tentativas.push(["endereço", `street=${encodeURIComponent(rua)}&city=${encodeURIComponent(cidade)}&state=Paran%C3%A1`]);
+  if (rua) tentativas.push(["rua (sem número)", `street=${encodeURIComponent(rua.replace(/\s+\d+\s*$/, ""))}&city=${encodeURIComponent(cidade)}&state=Paran%C3%A1`]);
+  if (r.loteamento) tentativas.push(["bairro/loteamento", `q=${encodeURIComponent(r.loteamento + ", " + cidade + ", PR")}`]);
+  for (const [precisao, q] of tentativas) {
+    try {
+      const d = await (await fetch(base + q)).json();
+      if (d.length) return { lat: +d[0].lat, lon: +d[0].lon, precisao, nome: d[0].display_name };
+    } catch {}
+  }
+  // cidade (para a região e para a busca de hidrografia)
+  let centro = null;
   try {
-    const d = await (await api("/api/diretrizes/analisar", { method: "POST", body: fd })).json();
-    const temas = Object.entries(d.trechos_por_tema).map(([t, l]) => `<details><summary>${esc(t.replace(/_/g, " "))} (${l.length})</summary><ul>${l.map(x => `<li>${esc(x)}</li>`).join("")}</ul></details>`).join("");
-    $("#dir-res").innerHTML = `<div class="card"><h2>Diretrizes identificadas</h2>${alertasHTML(d.alertas)}
-      <table><tr><th>Consulta</th><td>${esc(d.numero_consulta || "—")}</td></tr><tr><th>Zonas</th><td>${d.zonas.map(z => `<span class="tag">${esc(z)}</span>`).join("") || "—"}</td></tr>
-      <tr><th>Macrozona</th><td>${esc(d.macrozona || "—")}</td></tr><tr><th>Lote mínimo</th><td>${fmt(d.lote_minimo_m2)} m²</td></tr><tr><th>Testada mínima</th><td>${fmt(d.testada_minima_m)} m</td></tr>
-      <tr><th>Áreas públicas</th><td>${Object.entries(d.percentuais_areas).map(([k, v]) => `${esc(k)}: ${fmt(v, 1)}%`).join("<br>") || "—"}</td></tr>
-      <tr><th>Caixas de via</th><td>${d.larguras_vias_m.map(v => fmt(v, 1) + " m").join(", ") || "—"}</td></tr>
-      <tr><th>Faixas</th><td>${d.faixas_m.map(f => `${esc(f.descricao)}: ${fmt(f.largura_m, 1)} m`).join("<br>") || "—"}</td></tr></table></div>
-      <div class="card"><h2>Trechos por tema</h2>${temas || "<p class='muted'>Nenhum.</p>"}</div>`;
-  } catch (e) { erro("#dir-res", e); }
+    const d = await (await fetch(base + `city=${encodeURIComponent(cidade)}&state=Paran%C3%A1`)).json();
+    if (d.length) centro = { lat: +d[0].lat, lon: +d[0].lon, bbox: d[0].boundingbox.map(Number) };
+  } catch {}
+  // glebas com nome de curso d'água ("Gleba Ribeirão Jacutinga"): ponto do curso d'água mais próximo do centro
+  const agua = (r.loteamento || "").match(/(Ribeir[ãa]o|C[óo]rrego|Rio|Arroio)\s+(?:d[oae]s?\s+)?(.+)$/i);
+  if (agua && centro && CAM.drenagem) {
+    try {
+      const [s0, n0, w0, e0] = centro.bbox;
+      const feats = await wfsNavegador(CAM.drenagem.wfs, CAM.drenagem.layers, [w0 - .05, s0 - .05, e0 + .05, n0 + .05], 2000);
+      const alvo = agua[2].normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+      let melhor = null;
+      for (const f of feats) {
+        const nome = (f.properties.nome || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        if (!nome.includes(alvo)) continue;
+        const linhas = f.geometry.type === "LineString" ? [f.geometry.coordinates] : f.geometry.coordinates;
+        for (const ln of linhas) for (const [lo, la] of ln) {
+          const d = Math.hypot((lo - centro.lon) * Math.cos(centro.lat * Math.PI / 180), la - centro.lat);
+          if (!melhor || d < melhor.d) melhor = { d, lat: la, lon: lo, nome: f.properties.nome };
+        }
+      }
+      if (melhor) return { lat: melhor.lat, lon: melhor.lon, precisao: `${melhor.nome} (hidrografia IBGE) — posição só da região`, nome: `${r.loteamento}, ${cidade}` };
+    } catch {}
+  }
+  if (centro) return { lat: centro.lat, lon: centro.lon, precisao: "centro da cidade — posição só de referência", nome: cidade };
+  return null;
+}
+async function iniciarLocalizacao(r) {
+  const ref = areaReferencia(r);
+  $("#mat-local").innerHTML = `<p class="muted">O imóvel não tem coordenadas. Procurando a localização no mapa…</p>`;
+  const loc = await geocodificar(r);
+  if (estado.matricula !== r) return;
+  let html = "";
+  if (loc) {
+    const mk = L.marker([loc.lat, loc.lon]).on("click", e => { if (estado.desenho) { mk.closePopup(); adicionarPonto(e.latlng); } }).addTo(camadaMat)
+      .bindPopup(`<b>Localização aproximada</b><br>pelo ${esc(loc.precisao)}<br><span class="muted">${esc(loc.nome)}</span><br>${linksGoogle(loc.lat.toFixed(6), loc.lon.toFixed(6))}`).openPopup();
+    mapa.setView([loc.lat, loc.lon], 18);
+    if (r.forma && !r.manual) {
+      $("#mat-local").innerHTML = `<p class="muted">Montando o contorno pela metragem da matrícula…</p>`;
+      const rumo = r.forma.orientacao === "rua" ? await rumoDaRua(r, loc) : null;
+      r.posicao = { lat: loc.lat, lon: loc.lon, rumo: rumo ?? 90, rumoRua: rumo != null, lado: 1, afastamento: 6, rot: 0, precisao: loc.precisao };
+      return reposicionar(r);
+    }
+    html += `<div class="alerta" style="border-left-color:var(--info);background:var(--info-soft)">Localização <b>aproximada</b> pelo ${esc(loc.precisao)} (OpenStreetMap). Confira no satélite onde fica o imóvel.</div>`;
+  } else {
+    html += `<div class="alerta">Endereço não encontrado no mapa. Navegue até o imóvel e contorne o terreno.</div>`;
+  }
+  html += `<p style="margin:12px 0 0"><b>Marcar o terreno e as medidas</b></p>
+    <ol class="passos"><li>Clique em <b>Contornar terreno</b>.</li><li>Clique no mapa em cada canto do terreno, em sequência.</li>
+    <li>As medidas de cada lado aparecem enquanto você desenha. Clique em <b>Concluir</b> no fim.</li></ol>
+    ${ref ? `<p class="muted">Área para comparar: <b>${fmt(ref)} m²</b> ${r.unidade_autonoma ? "(terreno do condomínio)" : "(área da matrícula)"}.</p>` : ""}
+    <button class="btn" id="des-ini">Contornar terreno</button><button class="btn sec" id="des-desf" disabled>Desfazer ponto</button><button class="btn sec" id="des-fim" disabled>Concluir</button><button class="btn sec" id="des-canc" disabled>Cancelar</button>
+    <p class="muted" id="des-info"></p>`;
+  $("#mat-local").innerHTML = html;
+  $("#des-ini").onclick = () => iniciarDesenho(r);
+  $("#des-desf").onclick = () => { estado.desenho?.pontos.pop(); redesenhar(); };
+  $("#des-canc").onclick = () => encerrarDesenho();
+  $("#des-fim").onclick = () => concluirDesenho(r);
+}
+// rumo da rua (azimute em graus) no ponto encontrado, pela geometria do OpenStreetMap
+async function rumoDaRua(r, loc) {
+  if (!r.endereco) return null;
+  const rua = r.endereco.replace(/\s+nº?\s*\d+.*$/, "");
+  const cidade = (r.comarca || "Londrina").toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=8&countrycodes=br&polygon_geojson=1&street=${encodeURIComponent(rua)}&city=${encodeURIComponent(cidade)}`;
+    const vias = await (await fetch(url)).json();
+    let melhor = null;
+    const lat0 = loc.lat * Math.PI / 180, m = (lo, la) => [(lo - loc.lon) * 111320 * Math.cos(lat0), (la - loc.lat) * 110540];
+    for (const v of vias) {
+      const g = v.geojson; if (!g) continue;
+      const linhas = g.type === "LineString" ? [g.coordinates] : g.type === "MultiLineString" ? g.coordinates : [];
+      for (const ln of linhas) for (let i = 0; i < ln.length - 1; i++) {
+        const [ax, ay] = m(...ln[i]), [bx, by] = m(...ln[i + 1]);
+        const dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy; if (!L2) continue;
+        const t = Math.max(0, Math.min(1, -(ax * dx + ay * dy) / L2));
+        const dist = Math.hypot(ax + t * dx, ay + t * dy);
+        if (!melhor || dist < melhor.dist) melhor = { dist, rumo: (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360 };
+      }
+    }
+    return melhor && melhor.dist < 150 ? melhor.rumo : null;
+  } catch { return null; }
+}
+// cantos do terreno em lat/lng a partir da forma (metros) e da posição/rotação escolhidas
+// metros (x = Leste, y = Norte, já centrados no lote) -> [lon, lat], com rotação em graus
+function metrosParaLonLat(en, pos) {
+  const rad = Math.PI / 180, a = 6378137, e2 = 0.00669438, k = 0.9996, t = (pos.rot || 0) * rad;
+  const lat0 = pos.lat * rad, w = 1 - e2 * Math.sin(lat0) ** 2, M = a * (1 - e2) / w ** 1.5, N = a / Math.sqrt(w);
+  return en.map(([x, y]) => {
+    const e = x * Math.cos(t) + y * Math.sin(t), n = -x * Math.sin(t) + y * Math.cos(t);
+    return [pos.lon + e / k / (N * Math.cos(lat0)) / rad, pos.lat + n / k / M / rad];
+  });
+}
+const ESTILO_CROQUI = {
+  via_coletora: { color: "#ff7f00" }, via_arterial: { color: "#ff0000" }, via_local_ferrovia: { color: "#767676" },
+  hidrografia: { color: "#007fff" }, fundo_de_vale: { color: "#3fae5a" }, base_cadastral: { color: "#bdbdbd" },
+  fundo_de_vale_area: { color: "#3fae5a", fillOpacity: .22 },
 };
+const rendererCroqui = L.canvas({ padding: 0.5 });
+function desenharCroqui(r, camada) {
+  const pos = r.posicao || r.croquiPos;
+  if (!r.croqui || !pos) return;
+  const pos0 = { ...pos, rot: pos.rot || 0 };
+  for (const f of r.croqui.feicoes) {
+    const st = ESTILO_CROQUI[f.tipo] || { color: "#999" };
+    const ll = metrosParaLonLat(f.pts, pos0).map(([lo, la]) => [la, lo]);
+    const opc = { renderer: rendererCroqui, interactive: false, color: st.color, weight: f.tipo === "base_cadastral" ? 1 : 2, opacity: f.tipo === "base_cadastral" ? .7 : .95 };
+    (f.geom === "poligono" ? L.polygon(ll, { ...opc, fillColor: st.color, fillOpacity: st.fillOpacity ?? .9, weight: 0 }) : L.polyline(ll, opc)).addTo(camada);
+  }
+}
+function cantosDaForma(r) {
+  const f = r.forma, p = r.posicao, rad = Math.PI / 180, a = 6378137, e2 = 0.00669438;
+  const lat0 = p.lat * rad, w = 1 - e2 * Math.sin(lat0) ** 2, M = a * (1 - e2) / w ** 1.5, N = a / Math.sqrt(w);
+  const pts = f.pontos_m;
+  let en;
+  if (f.orientacao === "fixa") {  // memorial com azimutes: forma já orientada (x=Leste, y=Norte)
+    const cx = pts.reduce((s, q) => s + q[0], 0) / pts.length, cy = pts.reduce((s, q) => s + q[1], 0) / pts.length, t = p.rot * rad;
+    en = pts.map(([x, y]) => [(x - cx) * Math.cos(t) + (y - cy) * Math.sin(t), -(x - cx) * Math.sin(t) + (y - cy) * Math.cos(t)]);
+  } else {  // frente alinhada à rua, lote do lado escolhido
+    const th = (p.rumo + p.rot) * rad, F = pts[1][0];
+    const u = [Math.sin(th), Math.cos(th)], n = [Math.cos(th) * p.lado, -Math.sin(th) * p.lado];
+    en = pts.map(([x, y]) => [u[0] * (x - F / 2) + n[0] * (y + p.afastamento), u[1] * (x - F / 2) + n[1] * (y + p.afastamento)]);
+  }
+  const k = 0.9996;  // fator de escala UTM: as medidas da matrícula passam a coincidir com as distâncias UTM
+  return en.map(([e, nn]) => [p.lon + e / k / (N * Math.cos(lat0)) / rad, p.lat + nn / k / M / rad]);
+}
+async function reposicionar(r) {
+  try {
+    const ref = areaReferencia(r);
+    const d = await postJSON("api/geo/poligono", { coords_lonlat: cantosDaForma(r), area_referencia_m2: ref });
+    Object.assign(r, { vertices: d.vertices, segmentos: d.segmentos, geojson: d.geojson, area_calculada_m2: d.area_m2, perimetro_m: d.perimetro_m, epsg: d.epsg,
+      datum: `SIRGAS 2000 / UTM ${d.epsg - 31960}S (contorno automático pela metragem)` });
+    r.alertas = r.alertas.filter(a => !a.startsWith("Contorno"));
+    r.alertas.unshift(`Contorno automático montado pela ${r.forma.fonte} e posicionado pelo ${r.posicao.precisao} (OpenStreetMap)` +
+      (r.forma.orientacao === "rua" ? (r.posicao.rumoRua ? ", com a frente alinhada à rua." : "; a direção da rua não foi encontrada.") : ".") +
+      " Confira no satélite e ajuste a posição se necessário.", ...r.forma.avisos.map(a => "Contorno: " + a));
+    renderMatricula(r);
+  } catch (e) { erro("#mat-res", e); }
+}
+function controlesPosicao(r) {
+  if (!r.posicao) return "";
+  return `<div id="mat-ajuste" style="margin-top:14px"><p style="margin:0"><b>Ajustar o contorno automático</b></p>
+    <p class="muted" style="margin:4px 0 0">Arraste o marcador ✥ no centro do terreno para mover. Use os botões para girar ou trocar o lado da rua.</p>
+    <button class="btn sec" data-aj="rot:-5">↺ 5°</button><button class="btn sec" data-aj="rot:-1">↺ 1°</button><button class="btn sec" data-aj="rot:1">↻ 1°</button><button class="btn sec" data-aj="rot:5">↻ 5°</button>
+    ${r.forma.orientacao === "rua" ? `<button class="btn sec" data-aj="lado">Trocar lado da rua</button>` : ""}
+    <button class="btn sec" data-aj="manual">Redesenhar manualmente</button></div>`;
+}
+function ligarControlesPosicao(r) {
+  if (!r.posicao) return;
+  document.querySelectorAll("[data-aj]").forEach(b => b.onclick = () => {
+    const [acao, v] = b.dataset.aj.split(":");
+    if (acao === "rot") r.posicao.rot += +v;
+    if (acao === "lado") r.posicao.lado *= -1;
+    if (acao === "manual") {
+      Object.assign(r, { posicao: null, manual: true, geojson: null, vertices: [], segmentos: [], area_calculada_m2: null, perimetro_m: null, datum: null });
+      r.alertas = r.alertas.filter(a => !a.startsWith("Contorno"));
+      return renderMatricula(r);
+    }
+    reposicionar(r);
+  });
+  const cs = r.geojson.geometry.coordinates[0].slice(0, -1);
+  const centro = [cs.reduce((s, c) => s + c[1], 0) / cs.length, cs.reduce((s, c) => s + c[0], 0) / cs.length];
+  const alca = L.marker(centro, { draggable: true, title: "Arraste para mover o terreno",
+    icon: L.divIcon({ className: "", html: '<div style="width:30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:18px;box-shadow:0 2px 6px rgba(0,0,0,.4);cursor:move">✥</div>', iconSize: [30, 30], iconAnchor: [15, 15] }) }).addTo(camadaMat);
+  alca.on("dragend", () => {
+    const n = alca.getLatLng();
+    r.posicao.lat += n.lat - centro[0]; r.posicao.lon += n.lng - centro[1];
+    reposicionar(r);
+  });
+}
+const camadaDesenho = L.layerGroup().addTo(mapa);
+function iniciarDesenho(r) {
+  estado.desenho = { pontos: [], ref: areaReferencia(r) };
+  mapa.getContainer().classList.add("desenhando"); mapa.closePopup();
+  camadaMat.eachLayer(l => l.closePopup && l.closePopup());
+  ["#des-desf", "#des-fim", "#des-canc"].forEach(id => $(id).disabled = false); $("#des-ini").disabled = true;
+  redesenhar();
+}
+function adicionarPonto(ll) { estado.desenho.pontos.push(ll); redesenhar(); }
+function areaPlana(pts) {  // área em m² no elipsoide GRS80 (SIRGAS 2000), próxima da área UTM do cálculo final
+  if (pts.length < 3) return 0;
+  const a = 6378137, e2 = 0.00669438, rad = Math.PI / 180;
+  const lat0 = pts.reduce((s, p) => s + p.lat, 0) / pts.length * rad, w = 1 - e2 * Math.sin(lat0) ** 2;
+  const M = a * (1 - e2) / w ** 1.5, N = a / Math.sqrt(w), k = 0.9996;  // raios de curvatura e escala UTM
+  const xy = pts.map(p => [p.lng * rad * N * Math.cos(lat0) * k, p.lat * rad * M * k]);
+  let s = 0; xy.forEach((a, i) => { const b = xy[(i + 1) % xy.length]; s += a[0] * b[1] - b[0] * a[1]; });
+  return Math.abs(s) / 2;
+}
+function redesenhar() {
+  camadaDesenho.clearLayers();
+  const d = estado.desenho; if (!d) return;
+  const pts = d.pontos;
+  pts.forEach(p => L.circleMarker(p, { radius: 5, color: "#fff", weight: 2, fillColor: corMapa(), fillOpacity: 1 }).addTo(camadaDesenho));
+  if (pts.length >= 2) (pts.length >= 3 ? L.polygon(pts, { color: corMapa(), weight: 3, fillOpacity: .15, dashArray: "6 5" }) : L.polyline(pts, { color: corMapa(), weight: 3 })).addTo(camadaDesenho);
+  const area = areaPlana(pts);
+  desenharMedidas(pts, pts.length >= 3 ? area : null, camadaDesenho);
+  const dif = d.ref && area ? ` (${area >= d.ref ? "+" : ""}${fmt((area - d.ref) / d.ref * 100, 1)}% em relação a ${fmt(d.ref)} m²)` : "";
+  $("#des-info").innerHTML = pts.length ? `${pts.length} ponto(s)${pts.length >= 3 ? ` — área <b>${fmt(area)} m²</b>${dif}` : ""}` : "Clique no primeiro canto do terreno.";
+}
+function encerrarDesenho() {
+  estado.desenho = null; camadaDesenho.clearLayers(); mapa.getContainer().classList.remove("desenhando");
+  if ($("#des-ini")) { $("#des-ini").disabled = false; ["#des-desf", "#des-fim", "#des-canc"].forEach(id => $(id).disabled = true); $("#des-info").textContent = ""; }
+}
+async function concluirDesenho(r) {
+  const pts = estado.desenho?.pontos || [];
+  if (pts.length < 3) return $("#des-info").textContent = "Marque pelo menos 3 cantos.";
+  try {
+    const d = await postJSON("api/geo/poligono", { coords_lonlat: pts.map(p => [p.lng, p.lat]), area_referencia_m2: areaReferencia(r) });
+    encerrarDesenho();
+    Object.assign(r, { vertices: d.vertices, segmentos: d.segmentos, geojson: d.geojson, area_calculada_m2: d.area_m2, perimetro_m: d.perimetro_m, epsg: d.epsg,
+      datum: `SIRGAS 2000 / UTM ${d.epsg - 31960}S (contorno desenhado no mapa)` });
+    r.alertas = r.alertas.filter(a => !a.startsWith("Contorno desenhado"));
+    r.alertas.unshift(`Contorno desenhado no mapa: ${fmt(d.area_m2)} m²` + (d.diferenca_pct != null ? ` (${d.diferenca_pct >= 0 ? "+" : ""}${fmt(d.diferenca_pct, 1)}% em relação a ${fmt(areaReferencia(r))} m² da matrícula).` : ".") +
+      " É uma marcação aproximada sobre a imagem de satélite, não um levantamento topográfico.");
+    renderMatricula(r);
+  } catch (e) { $("#des-info").textContent = e.message; }
+}
+
+// ---------- diretrizes
+async function analisarDiretrizes({ arq, texto, aviso, vincularMatricula = false }) {
+  const t = arq ? (await textoDoArquivo(arq, aviso)).texto : texto || "";
+  if (!t.trim()) throw new Error("Escolha um arquivo ou cole o texto da consulta.");
+  if (arq) $("#dir-txt").value = t;
+  const fd = new FormData();
+  fd.append("texto", t);
+  // o PDF vai junto para extrair o croqui vetorial (limite de envio da Vercel: 4,5 MB)
+  if (arq && /\.pdf$/i.test(arq.name) && arq.size < 4.3e6) fd.append("arquivo", arq);
+  aviso("Analisando a consulta do IPPUL…");
+  const d = await (await api("api/diretrizes/analisar", { method: "POST", body: fd })).json();
+  renderDiretrizes(d);
+  await imovelDasDiretrizes(d, vincularMatricula);
+  aplicarDiretrizesNoMasterplan(d);
+  return d;
+}
+$("#dir-ir").onclick = async () => {
+  try { await analisarDiretrizes({ arq: $("#dir-arq").files[0], texto: $("#dir-txt").value, aviso: t => carregando("#dir-res", t) }); }
+  catch (e) { erro("#dir-res", e); }
+};
+
+const ROTULOS_CARAC = { lote: "Lote", gleba: "Gleba", quadra: "Quadra", loteamento: "Loteamento", area_total_m2: "Área total", lote_origem: "Lote de origem",
+  matricula: "Matrícula", inscricao_imobiliaria: "Inscrição imobiliária", modalidade: "Modalidade", finalidade: "Finalidade", n_lotes_estimado: "Nº estimado de lotes", mapa_vinculado: "Mapa vinculado" };
+const ROTULOS_PARAM = { faixa_transicao_m: ["Faixa de transição (zona industrial)", "m"], quadra_max_m: ["Maior dimensão da quadra", "m"],
+  distancia_coletoras_max_m: ["Distância máxima entre coletoras", "m"], areas_publicas_min_pct: ["Áreas públicas (praça + institucional)", "%"],
+  declividade_max_pct: ["Declividade máxima para parcelar", "%"], circulo_minimo_area_publica_m: ["Círculo mínimo inscrito em área pública", "m"], validade_dias: ["Validade da consulta", "dias"] };
+function renderDiretrizes(d) {
+  const c = d.caracterizacao || {};
+  const carac = Object.entries(c).map(([k, v]) => `<tr><th>${ROTULOS_CARAC[k] || k}</th><td>${k === "area_total_m2" ? fmt(v) + " m²" : esc(v)}</td></tr>`).join("");
+  const vias = d.vias.length ? `<table><tr><th>Via</th><th>Hierarquia</th><th>Largura</th><th>Calçada</th><th>Pista</th></tr>
+    ${d.vias.map(v => `<tr><td>${esc(v.via)}</td><td>${esc(v.hierarquia)}</td><td><b>${fmt(v.largura_total_m)} m</b></td><td>${v.calcada_m != null ? fmt(v.calcada_m) + " m" : "—"}</td><td>${v.pista_m != null ? fmt(v.pista_m) + " m" : "—"}</td></tr>`).join("")}</table>` : "";
+  const params = Object.entries(d.parametros || {}).map(([k, v]) => `<tr><th>${(ROTULOS_PARAM[k] || [k])[0]}</th><td>${fmt(v, Number.isInteger(v) ? 0 : 2)} ${(ROTULOS_PARAM[k] || [, ""])[1]}</td></tr>`).join("");
+  const temas = Object.entries(d.trechos_por_tema).map(([t, l]) => `<details><summary>${esc(t.replace(/_/g, " "))} (${l.length})</summary><ul>${l.map(x => `<li>${esc(x)}</li>`).join("")}</ul></details>`).join("");
+  const legenda = d.croqui ? `<div class="kpis" style="margin-top:10px">${[["lote", "#e5383f", "Lote da consulta"], ["via_coletora", "#ff7f00", "Via coletora"], ["via_arterial", "#ff0000", "Via arterial"],
+    ["via_local_ferrovia", "#767676", "Via local / ferrovia"], ["hidrografia", "#007fff", "Hidrografia"], ["fundo_de_vale", "#3fae5a", "Fundo de vale (área e limite)"]]
+    .map(([, cor, nome]) => `<div class="kpi" style="display:flex;gap:8px;align-items:center;padding:6px 10px"><i style="width:14px;height:14px;border-radius:3px;background:${cor};flex:none"></i><small style="margin:0">${nome}</small></div>`).join("")}</div>` : "";
+  $("#dir-res").innerHTML = `
+    <div class="card"><h2>Consulta ${esc(d.numero_consulta || "")}${d.processo_sei ? ` <span class="muted" style="font-weight:500">— SEI ${esc(d.processo_sei)}</span>` : ""}</h2>
+      ${alertasHTML(d.alertas)}
+      ${carac ? `<table style="margin-top:8px">${carac}</table>` : ""}
+      ${d.zonas.length ? `<p style="margin:12px 0 4px"><b>Zonas incidentes</b></p>${d.zonas.map(z => `<button class="tag" style="border:0;cursor:pointer" data-zona="${esc(z)}" title="Ver parâmetros da zona">${esc(z)}</button>`).join("")}` : ""}
+    </div>
+    <div class="card" id="dir-mapa"><h2>Área no mapa</h2>
+      ${d.croqui ? `<p class="muted" style="margin:0">O croqui do IPPUL foi colocado no mapa com escala pela área total (${fmt(c.area_total_m2)} m²; ${fmt(d.croqui.escala_m_por_pt, 3)} m por ponto do desenho).</p>${legenda}`
+        : `<p class="muted" style="margin:0">Sem croqui vetorial no documento: a área foi posicionada pela localização disponível.</p>`}
+      <div id="dir-ajuste"></div>
+      <button class="btn" id="dir-mp">Gerar masterplan com as diretrizes</button>
+    </div>
+    ${vias ? `<div class="card"><h2>Sistema viário previsto</h2>${vias}</div>` : ""}
+    ${params ? `<div class="card"><h2>Parâmetros para o parcelamento</h2><table>${params}</table></div>` : ""}
+    ${d.legislacao.length || d.orgaos_consultar.length ? `<div class="card"><h2>Legislação e órgãos</h2>
+      ${d.legislacao.length ? `<ul>${d.legislacao.map(l => `<li>${esc(l)}</li>`).join("")}</ul>` : ""}
+      ${d.orgaos_consultar.length ? `<p style="margin:10px 0 4px"><b>Órgãos a consultar</b></p><ul>${d.orgaos_consultar.map(o => `<li>${esc(o)}</li>`).join("")}</ul>` : ""}</div>` : ""}
+    <div class="card"><h2>Trechos por tema</h2>${temas || "<p class='muted'>Nenhum.</p>"}</div>`;
+  $("#dir-mp").onclick = () => { document.querySelector('[data-aba="masterplan"]').click(); atualizarOrigemMp(); $("#mp-ir").click(); };
+  document.querySelectorAll("[data-zona]").forEach(b => b.onclick = async () => {
+    document.querySelector('[data-aba="zoneamento"]').click();
+    $("#zon-cidade").value = "londrina"; await carregarZonas();
+    const op = [...$("#zon-zona").options].find(o => o.value.replace("-", "") === b.dataset.zona.replace("-", ""));
+    if (op) { $("#zon-zona").value = op.value; if (c.area_total_m2) $("#zon-area").value = Math.round(c.area_total_m2); $("#zon-ir").click(); }
+    else $("#zon-status").textContent = `A zona ${b.dataset.zona} ainda não está cadastrada na base de zoneamento.`;
+  });
+}
+
+// imóvel da consulta: reaproveita a matrícula analisada (mesmo imóvel) ou cria um a partir da caracterização
+function imovelDasDiretrizes(d, vincularMatricula = false) {
+  const c = d.caracterizacao || {};
+  const dig = v => String(v || "").replace(/\D/g, "");
+  let r = estado.matricula;
+  const areaParecida = !c.area_total_m2 || !areaReferencia(r || {}) || Math.abs(areaReferencia(r) - c.area_total_m2) / c.area_total_m2 < 0.1;
+  const mesma = r && (vincularMatricula || ((!c.matricula || dig(c.matricula) === dig(r.numero)) && areaParecida));
+  if (r && vincularMatricula && !areaParecida) {
+    r.alertas = (r.alertas || []).filter(a => !a.startsWith("Área da consulta"));
+    r.alertas.unshift(`Área da consulta do IPPUL (${fmt(c.area_total_m2)} m²) difere da matrícula (${fmt(areaReferencia(r))} m²): confira se os documentos são do mesmo imóvel.`);
+  }
+  if (!mesma) {
+    r = { numero: c.matricula ? String(c.matricula) : null, cartorio: null, comarca: "LONDRINA", tipo_imovel: c.gleba ? "gleba" : "urbano",
+      lote: c.lote || null, quadra: c.quadra || null, loteamento: c.loteamento || (c.gleba ? `Gleba ${c.gleba}` : null), endereco: null, cep: null,
+      inscricao_imobiliaria: c.inscricao_imobiliaria || null, area_declarada_m2: c.area_total_m2 || null, unidade_autonoma: null,
+      atos: [], vertices: [], segmentos: [], medidas: [], transmissoes: [], alertas: [], epsg: 31982, forma: null, geojson: null };
+  }
+  r.diretrizes = d; r.croqui = d.croqui || null;
+  r.alertas = (r.alertas || []).filter(a => !a.startsWith("Imóvel da consulta"));
+  r.alertas.push(`Imóvel da consulta ${d.numero_consulta || ""} do IPPUL${c.lote ? ` (lote ${c.lote}${c.gleba ? ", gleba " + c.gleba : ""})` : ""}.`);
+  const formaSoReferencia = !r.forma || /quadrado/.test(r.forma.fonte || "") || /croqui/.test(r.forma.fonte || "");
+  if (d.croqui && (!r.geojson || (r.posicao && formaSoReferencia))) {
+    // o croqui define a forma do lote (norte para cima); a posição vem da localização ou de um ajuste anterior
+    r.forma = { pontos_m: d.croqui.lote_m, orientacao: "fixa", fonte: "croqui do IPPUL (escala pela área total)", avisos: [d.croqui.aviso] };
+    if (r.posicao) { r.posicao.rot = 0; estado.matricula = r; return reposicionar(r); }
+  } else if (d.croqui && r.geojson) {
+    // matrícula com coordenadas ou medidas: o contorno dela prevalece e o croqui é encaixado sobre ele
+    // matrícula com coordenadas: encaixa o croqui sobre o polígono da matrícula
+    const cs = r.geojson.geometry.coordinates[0].slice(0, -1);
+    r.croquiPos = { lat: cs.reduce((s, q) => s + q[1], 0) / cs.length, lon: cs.reduce((s, q) => s + q[0], 0) / cs.length, rot: 0 };
+  }
+  estado.matricula = r;
+  renderMatricula(r);
+}
 
 // ---------- zoneamento
 async function carregarCidades() {
-  const { cidades } = await (await api("/api/zoneamento")).json();
+  const { cidades } = await (await api("api/zoneamento")).json();
   $("#zon-cidade").innerHTML = cidades.map(c => `<option>${c}</option>`).join("");
   await carregarZonas();
 }
 async function carregarZonas() {
-  const d = await (await api("/api/zoneamento/" + $("#zon-cidade").value)).json();
+  const d = await (await api("api/zoneamento/" + $("#zon-cidade").value)).json();
   $("#zon-zona").innerHTML = Object.entries(d.zonas).map(([k, z]) => `<option value="${k}">${k} — ${esc(z.nome)}</option>`).join("");
   $("#zon-status").textContent = d.status_dados || "";
 }
@@ -252,7 +1194,7 @@ $("#zon-cidade").onchange = carregarZonas;
 $("#zon-ir").onclick = async () => {
   try {
     const body = { cidade: $("#zon-cidade").value, zona: $("#zon-zona").value, area_terreno_m2: +$("#zon-area").value, area_app_m2: +$("#zon-app").value };
-    const d = await (await api("/api/vocacao", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
+    const d = await (await api("api/vocacao", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
     const z = d.zona, v = d.vocacao;
     $("#zon-res").innerHTML = `<div class="card"><h2>${esc(z.codigo)} — ${esc(z.nome)}</h2>${alertasHTML(v.observacoes)}
       <div class="kpis"><div class="kpi"><small>Potencial construtivo</small><b>${fmt(v.potencial_construtivo_m2, 0)} m²</b></div><div class="kpi"><small>Projeção máxima</small><b>${fmt(v.projecao_maxima_m2, 0)} m²</b></div></div>
@@ -264,20 +1206,39 @@ $("#zon-ir").onclick = async () => {
 
 // ---------- formulários gerados a partir do schema da API
 async function schemas() {
-  if (!estado.schemas) estado.schemas = (await (await api("/openapi.json")).json()).components.schemas;
+  if (!estado.schemas) estado.schemas = (await (await api("openapi.json")).json()).components.schemas;
   return estado.schemas;
+}
+const PALAVRAS = { area: "área", areas: "áreas", minimo: "mínimo", minima: "mínima", angulo: "ângulo", publica: "pública", app: "APP",
+  viario: "viário", preco: "preço", aprovacao: "aprovação", aprovacoes: "aprovações", comissao: "comissão", administracao: "administração",
+  loteavel: "loteável", media: "média", tma: "TMA", cub: "CUB", nao: "não", computavel: "computável", eficiencia: "eficiência",
+  pre: "pré", lancamento: "lançamento", ate: "até", vgv: "VGV", m2: "m²", pct: "%", anual: "anual", graus: "(graus)" };
+function rotuloCampo(k) {
+  let t = k.replace(/_m2$/, "__m2").replace(/_m$/, "__m").replace(/_pct$/, "__pct");
+  const [base, un] = t.split("__");
+  let txt = base.split("_").map(w => PALAVRAS[w] ?? w).join(" ");
+  if (un) txt += un === "m2" ? " (m²)" : un === "m" ? " (m)" : " (%)";
+  return txt.replace(/^% (.*)$/, "$1 (%)").replace(/^./, c => c.toUpperCase());
 }
 function montarForm(alvo, schema, ignorar = []) {
   $(alvo).innerHTML = Object.entries(schema.properties).filter(([k]) => !ignorar.includes(k)).map(([k, p]) => {
     const tipo = p.type || (p.anyOf && p.anyOf.find(x => x.type !== "null")?.type);
     const req = (schema.required || []).includes(k);
-    const rotulo = k.replace(/^pct_/, "% ").replace(/_m2\b/, " (m²)").replace(/_m\b/, " (m)").replace(/_pct\b/, " (%)").replace(/_/g, " ").replace(/^./, c => c.toUpperCase());
-    return `<div><label title="${esc(p.description || "")}">${esc(rotulo)}${req ? " *" : ""}</label><input data-campo="${k}" type="number" step="any" value="${p.default ?? ""}" ${req ? "required" : ""} placeholder="${esc(p.description || "")}"></div>`;
+    const rotulo = ROTULOS_ESPECIAIS[k] || rotuloCampo(k);
+    const titulo = `<label title="${esc(p.description || "")}">${esc(rotulo)}${req ? " *" : ""}</label>`;
+    if (p.enum) return `<div>${titulo}<select data-campo="${k}" data-tipo="texto">${p.enum.map(v => `<option value="${v}" ${v === p.default ? "selected" : ""}>${esc(OPCOES[v] || v)}</option>`).join("")}</select></div>`;
+    if (tipo === "boolean") return `<div>${titulo}<select data-campo="${k}" data-tipo="bool"><option value="true" ${p.default ? "selected" : ""}>Sim</option><option value="false" ${p.default ? "" : "selected"}>Não</option></select></div>`;
+    return `<div>${titulo}<input data-campo="${k}" type="number" step="any" value="${p.default ?? ""}" ${req ? "required" : ""} placeholder="${esc(p.description || "")}"></div>`;
   }).join("");
 }
+const ROTULOS_ESPECIAIS = { tracado: "Traçado das ruas", usar_relevo: "Usar relevo (topografia)", declividade_maxima_pct: "Declividade máxima para lotes (%)" };
+const OPCOES = { organico: "Orgânico (acompanha o relevo)", ortogonal: "Ortogonal (malha reta)" };
 function lerForm(alvo) {
   const o = {};
-  document.querySelectorAll(`${alvo} [data-campo]`).forEach(i => { if (i.value !== "") o[i.dataset.campo] = Number(i.value); });
+  document.querySelectorAll(`${alvo} [data-campo]`).forEach(i => {
+    if (i.value === "") return;
+    o[i.dataset.campo] = i.dataset.tipo === "texto" ? i.value : i.dataset.tipo === "bool" ? i.value === "true" : Number(i.value);
+  });
   return o;
 }
 async function montarViabilidade() {
@@ -292,7 +1253,7 @@ $("#via-tipo").onchange = montarViabilidade;
 $("#via-ir").onclick = async () => {
   const tipo = $("#via-tipo").value;
   try {
-    const r = await (await api("/api/viabilidade/" + tipo, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(lerForm("#via-form")) })).json();
+    const r = await (await api("api/viabilidade/" + tipo, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(lerForm("#via-form")) })).json();
     const i = r.indicadores;
     const linhas = obj => Object.entries(obj).map(([k, v]) => `<tr><th>${esc(k.replace(/_/g, " "))}</th><td>${typeof v === "number" ? (/m2|pct/.test(k) ? fmt(v) : brl(v)) : v ?? "—"}</td></tr>`).join("");
     $("#via-res").innerHTML = `<div class="card"><h2>Resultado</h2>${alertasHTML(r.alertas)}
@@ -316,20 +1277,55 @@ function grafico(serie) {
   const W = 460, H = 160, min = Math.min(0, ...serie), max = Math.max(0, ...serie), n = serie.length - 1 || 1;
   const x = i => i / n * W, y = v => H - (v - min) / ((max - min) || 1) * H;
   const pts = serie.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
-  return `<svg viewBox="-60 -10 ${W + 70} ${H + 30}" style="width:100%"><line x1="0" x2="${W}" y1="${y(0)}" y2="${y(0)}" stroke="#999" stroke-dasharray="4"/>
-    <polyline points="${pts}" fill="none" stroke="#1f6f50" stroke-width="2"/>
-    <text x="-5" y="${y(max) + 4}" font-size="10" text-anchor="end">${(max / 1e6).toFixed(1)} mi</text><text x="-5" y="${y(min) + 4}" font-size="10" text-anchor="end">${(min / 1e6).toFixed(1)} mi</text>
-    <text x="${W}" y="${H + 18}" font-size="10" text-anchor="end">mês ${n}</text></svg>`;
+  return `<svg viewBox="-60 -10 ${W + 70} ${H + 30}" style="width:100%"><line x1="0" x2="${W}" y1="${y(0)}" y2="${y(0)}" style="stroke:var(--line-strong)" stroke-dasharray="4"/>
+    <polyline points="${pts}" fill="none" style="stroke:var(--accent)" stroke-width="2.5"/>
+    <text style="fill:var(--muted)" x="-5" y="${y(max) + 4}" font-size="10" text-anchor="end">${(max / 1e6).toFixed(1)} mi</text><text style="fill:var(--muted)" x="-5" y="${y(min) + 4}" font-size="10" text-anchor="end">${(min / 1e6).toFixed(1)} mi</text>
+    <text style="fill:var(--muted)" x="${W}" y="${H + 18}" font-size="10" text-anchor="end">mês ${n}</text></svg>`;
 }
 
 // ---------- masterplan
 let perimetroMp = null, epsgMp = 31982;
+let diretrizesMp = null;
 function atualizarOrigemMp() {
   const r = estado.matricula;
+  diretrizesMp = null;
   if (r?.vertices?.length >= 3 && r.vertices[0].e > 1000) {
     perimetroMp = r.vertices.map(v => [v.e, v.n]); epsgMp = r.epsg;
-    $("#mp-origem").textContent = `Perímetro da matrícula ${r.numero || ""}: ${r.vertices.length} vértices, ${fmt(r.area_calculada_m2)} m².`;
+    diretrizesMp = diretrizesParaMasterplan(r);
+    const nome = r.numero ? `da matrícula ${r.numero}` : r.lote ? `do lote ${r.lote}` : "do imóvel";
+    $("#mp-origem").innerHTML = `Perímetro ${esc(nome)}: ${r.vertices.length} vértices, ${fmt(r.area_calculada_m2)} m².` +
+      (diretrizesMp ? `<br><b>Diretrizes do IPPUL aplicadas:</b> ${diretrizesMp.resumo}.` : "");
   }
+}
+// croqui do IPPUL -> entradas do masterplan (UTM): vias previstas com largura oficial, fundo de vale e hidrografia
+function diretrizesParaMasterplan(r) {
+  if (!r.croqui) return null;
+  const pos = r.posicao || r.croquiPos; if (!pos) return null;
+  const cE = r.vertices.reduce((a, v) => a + v.e, 0) / r.vertices.length, cN = r.vertices.reduce((a, v) => a + v.n, 0) / r.vertices.length;
+  const t = (pos.rot || 0) * Math.PI / 180;
+  const utm = pts => pts.map(([x, y]) => [cE + x * Math.cos(t) + y * Math.sin(t), cN - x * Math.sin(t) + y * Math.cos(t)]);
+  const perto = pts => pts.some(([x, y]) => Math.hypot(x, y) < 600);
+  const vias = r.diretrizes?.vias || [];
+  const largura = h => Math.max(0, ...vias.filter(v => v.hierarquia.toLowerCase() === h).map(v => v.largura_total_m));
+  const tipos = { via_coletora: ["Coletora", largura("coletora") || 20], via_local_ferrovia: ["Local", largura("local") || 15], via_arterial: ["Arterial", largura("arterial") || 30] };
+  const vias_previstas = Object.entries(tipos).map(([tipo, [hierarquia, largura_m]]) => ({ hierarquia, largura_m,
+    partes_utm: r.croqui.feicoes.filter(f => f.tipo === tipo && f.geom === "poligono" && perto(f.pts)).map(f => utm(f.pts)) }))
+    .filter(v => v.partes_utm.length);
+  const fundo_vale_utm = r.croqui.feicoes.filter(f => f.tipo === "fundo_de_vale_area" && perto(f.pts)).map(f => utm(f.pts));
+  const hidrografia_utm = r.croqui.feicoes.filter(f => f.tipo === "hidrografia" && perto(f.pts)).map(f => utm(f.pts));
+  const partes = [...vias_previstas.map(v => `${v.hierarquia.toLowerCase()} de ${fmt(v.largura_m, 0)} m`),
+    fundo_vale_utm.length && "fundo de vale", hidrografia_utm.length && "córrego com APP"].filter(Boolean);
+  return { vias_previstas, fundo_vale_utm, hidrografia_utm, resumo: partes.join(", ") };
+}
+// parâmetros da consulta no formulário do masterplan
+function aplicarDiretrizesNoMasterplan(d) {
+  const set = (k, v) => { const i = document.querySelector(`#mp-form [data-campo="${k}"]`); if (i && v != null) i.value = v; };
+  const pub = d.parametros?.areas_publicas_min_pct;
+  if (pub) { set("pct_area_verde", pub / 2); set("pct_institucional", pub / 2); }
+  const local = (d.vias || []).find(v => v.hierarquia.toLowerCase() === "local");
+  if (local) set("largura_via_m", local.largura_total_m);
+  if (d.parametros?.quadra_max_m) { const q = document.querySelector('#mp-form [data-campo="comprimento_quadra_m"]'); if (q && +q.value > d.parametros.quadra_max_m) q.value = d.parametros.quadra_max_m; }
+  if ((d.zonas || []).some(z => /^ZR/i.test(z))) set("lote_minimo_m2", 250);
 }
 $("#mp-exemplo").onclick = () => {
   perimetroMp = [[480000, 7418000], [480420, 7418060], [480450, 7417690], [480020, 7417650]]; epsgMp = 31982;
@@ -337,46 +1333,641 @@ $("#mp-exemplo").onclick = () => {
 };
 async function montarMasterplan() {
   const s = await schemas();
-  montarForm("#mp-form", s.ParametrosMasterplan, ["perimetro_utm", "epsg", "exclusoes_utm", "cursos_dagua_utm"]);
+  montarForm("#mp-form", s.ParametrosMasterplan, ["perimetro_utm", "epsg", "exclusoes_utm", "cursos_dagua_utm", "vias_previstas", "fundo_vale_utm", "hidrografia_utm"]);
 }
-$("#mp-ir").onclick = async () => {
+async function gerarMasterplan() {
   atualizarOrigemMp();
-  if (!perimetroMp) return erro("#mp-res", "Sem perímetro: analise uma matrícula com coordenadas ou use o exemplo.");
-  try {
-    const body = { ...lerForm("#mp-form"), perimetro_utm: perimetroMp, epsg: epsgMp };
-    const m = await (await api("/api/masterplan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
-    estado.masterplan = m;
-    $("#mp-res").innerHTML = `<div class="card"><h2>Resultado</h2>${alertasHTML(m.alertas)}<div id="mp-svg">${m.svg}</div>
-      <button class="btn" id="mp-kml">Baixar KML (Google Earth)</button><button class="btn sec" id="mp-svgdl">Baixar imagem (SVG)</button><button class="btn sec" id="mp-via">Levar para viabilidade</button></div>`;
-    camadaMp.clearLayers();
-    const g = L.geoJSON({ type: "FeatureCollection", features: m.features }, {
-      style: f => ({ color: "#444", weight: f.properties.tipo === "lote" ? .5 : 1, fillColor: CORES[f.properties.tipo] || "#ccc", fillOpacity: .75 }),
-      onEachFeature: (f, l) => l.bindTooltip(`${esc(f.properties.nome)} — ${fmt(f.properties.area_m2)} m²`),
+  if (!perimetroMp) throw new Error("Sem perímetro: analise uma matrícula e confirme o contorno do imóvel no mapa (ou use o exemplo).");
+  const { resumo: _r, ...dirMp } = diretrizesMp || {};
+  const body = { ...lerForm("#mp-form"), perimetro_utm: perimetroMp, epsg: epsgMp, cursos_dagua_utm: estado.cursos || [], ...dirMp };
+  const m = await (await api("api/masterplan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
+  estado.masterplan = m;
+  $("#mp-res").innerHTML = `<div class="card"><h2>Resultado</h2>${alertasHTML(m.alertas)}${quadroMasterplan(m.resumo)}<div id="mp-svg" style="margin-top:12px">${m.svg}</div>
+    <button class="btn" id="mp-kml">Baixar KML (Google Earth)</button><button class="btn sec" id="mp-svgdl">Baixar imagem (SVG)</button><button class="btn sec" id="mp-via">Levar para viabilidade</button>
+    <button class="btn" id="mp-img">Gerar imagem de apresentação</button></div><div id="mp-img-res"></div>`;
+  $("#mp-img").onclick = () => mostrarImagemApresentacao(m, "#mp-img-res");
+  desenharMasterplan(m, true);
+  $("#mp-kml").onclick = () => baixarKmlMasterplan(m);
+  $("#mp-svgdl").onclick = () => baixar(new Blob([m.svg], { type: "image/svg+xml" }), "masterplan.svg");
+  $("#mp-via").onclick = () => levarParaViabilidade(m);
+  return m;
+}
+$("#mp-ir").onclick = async () => { try { await gerarMasterplan(); } catch (e) { erro("#mp-res", e); } };
+
+function quadroMasterplan(r) {
+  return `<div class="kpis">
+    <div class="kpi"><small>Lotes</small><b>${r.numero_lotes}</b></div>
+    <div class="kpi"><small>Lote médio</small><b>${fmt(r.lote_medio_m2, 0)} m²</b></div>
+    <div class="kpi"><small>Área em lotes</small><b>${fmt(r.pct_lotes, 1)}%</b></div>
+    <div class="kpi"><small>Vias${r.area_vias_diretriz_m2 ? " (inclui previstas)" : ""}</small><b>${fmt(r.pct_vias, 1)}%</b></div>
+    <div class="kpi"><small>Área verde</small><b>${fmt(r.pct_verde, 1)}%</b></div>
+    <div class="kpi"><small>Institucional</small><b>${fmt(r.pct_institucional, 1)}%</b></div>
+    <div class="kpi"><small>APP / fundo de vale</small><b>${fmt(r.area_app_m2, 0)} m²</b></div>
+    ${r.relevo?.cota_min_m != null ? `<div class="kpi"><small>Relevo (cotas)</small><b>${fmt(r.relevo.cota_min_m, 0)}–${fmt(r.relevo.cota_max_m, 0)} m</b></div>
+    <div class="kpi"><small>Declividade média</small><b>${fmt(r.relevo.declividade_media_pct, 1)}%</b></div>` : ""}
+    ${r.area_declividade_excessiva_m2 ? `<div class="kpi"><small>Declividade ≥ limite</small><b>${fmt(r.area_declividade_excessiva_m2, 0)} m²</b></div>` : ""}
+  </div>${r.relevo?.fonte ? `<p class="muted" style="margin:6px 0 0">Relevo: ${esc(r.relevo.fonte)}; curvas a cada ${fmt(r.relevo.intervalo_curvas_m, 0)} m. O projeto exige levantamento planialtimétrico.</p>` : ""}`;
+}
+const baixarKmlMasterplan = async m => baixar(await (await api("api/geo/kml-features", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome: "Masterplan", features: m.features }) })).blob(), "masterplan.kml");
+async function levarParaViabilidade(m) {
+  document.querySelector('[data-aba="viabilidade"]').click(); $("#via-tipo").value = "loteamento"; await montarViabilidade();
+  const r = m.resumo, set = (k, v) => { const i = document.querySelector(`#via-form [data-campo="${k}"]`); if (i) i.value = v; };
+  set("area_gleba_m2", Math.round(r.area_gleba_m2)); set("area_app_m2", Math.round(r.area_app_m2));
+  set("pct_sistema_viario", (r.area_vias_m2 / r.area_util_m2 * 100).toFixed(1)); set("pct_area_verde", (r.area_verde_m2 / r.area_util_m2 * 100).toFixed(1));
+  set("pct_institucional", (r.area_institucional_m2 / r.area_util_m2 * 100).toFixed(1)); set("area_media_lote_m2", r.lote_medio_m2.toFixed(0));
+}
+
+// masterplan no mapa com demarcações: quadras, lotes (número e área), áreas públicas, vias previstas, APP
+const camadaRotulosMp = L.layerGroup().addTo(mapa);
+const NOMES_TIPO = { area_verde: "Área verde", institucional: "Institucional", app: "APP / fundo de vale", remanescente: "Remanescente" };
+function desenharMasterplan(m, ajustar = false) {
+  camadaMp.clearLayers(); camadaRotulosMp.clearLayers();
+  if (m.curvas_nivel?.length) {
+    L.geoJSON({ type: "FeatureCollection", features: m.curvas_nivel }, { interactive: false,
+      style: f => ({ color: "#8d6e63", weight: f.properties.mestra ? 1.6 : .7, opacity: f.properties.mestra ? .9 : .6 }),
+      onEachFeature: (f, l) => { if (f.properties.mestra) l.bindTooltip(`${fmt(f.properties.cota_m, 0)} m`, { permanent: true, direction: "center", className: "medida medida-cota" }); },
     }).addTo(camadaMp);
-    mapa.fitBounds(g.getBounds());
-    $("#mp-kml").onclick = async () => baixar(await (await api("/api/geo/kml-features", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome: "Masterplan", features: m.features }) })).blob(), "masterplan.kml");
-    $("#mp-svgdl").onclick = () => baixar(new Blob([m.svg], { type: "image/svg+xml" }), "masterplan.svg");
-    $("#mp-via").onclick = async () => {
-      document.querySelector('[data-aba="viabilidade"]').click(); $("#via-tipo").value = "loteamento"; await montarViabilidade();
-      const r = m.resumo, set = (k, v) => { const i = document.querySelector(`[data-campo="${k}"]`); if (i) i.value = v; };
-      set("area_gleba_m2", Math.round(r.area_gleba_m2)); set("area_app_m2", Math.round(r.area_app_m2));
-      set("pct_sistema_viario", (r.area_vias_m2 / r.area_util_m2 * 100).toFixed(1)); set("pct_area_verde", (r.area_verde_m2 / r.area_util_m2 * 100).toFixed(1));
-      set("pct_institucional", (r.area_institucional_m2 / r.area_util_m2 * 100).toFixed(1)); set("area_media_lote_m2", r.lote_medio_m2.toFixed(0));
-    };
-  } catch (e) { erro("#mp-res", e); }
+  }
+  const g = L.geoJSON({ type: "FeatureCollection", features: m.features }, {
+    style: f => ({ color: f.properties.diretriz ? "#ff7f00" : "#444", weight: f.properties.tipo === "lote" ? .6 : f.properties.diretriz ? 2 : 1,
+      fillColor: CORES[f.properties.tipo] || "#ccc", fillOpacity: f.properties.tipo === "app" ? .45 : .8, dashArray: f.properties.diretriz ? "6 4" : null }),
+    onEachFeature: (f, l) => l.bindTooltip(`${esc(f.properties.nome)} — ${fmt(f.properties.area_m2)} m²`),
+  }).addTo(camadaMp);
+  const centro = f => L.geoJSON(f).getBounds().getCenter();
+  const rotulo = (ll, html, cls = "medida") => L.tooltip({ permanent: true, direction: "center", className: cls, interactive: false }).setLatLng(ll).setContent(html);
+  // quadras: rótulo no centro do conjunto de lotes
+  const quadras = {};
+  m.features.filter(f => f.properties.tipo === "lote").forEach(f => (quadras[f.properties.quadra] ||= []).push(f));
+  const rotLotes = L.layerGroup(), rotQuadras = L.layerGroup(), rotAreas = L.layerGroup();
+  Object.entries(quadras).forEach(([q, fs]) => {
+    rotulo(L.geoJSON({ type: "FeatureCollection", features: fs }).getBounds().getCenter(), `<b>${q}</b> · ${fs.length} lotes`, "medida medida-area").addTo(rotQuadras);
+    fs.forEach(f => rotulo(centro(f), `${f.properties.nome.split("-")[1]}<br>${fmt(f.properties.area_m2, 0)} m²`, "medida medida-lote").addTo(rotLotes));
+  });
+  m.features.filter(f => f.properties.tipo !== "lote" && (f.properties.area_m2 > 150) && (f.properties.tipo !== "via" || f.properties.diretriz))
+    .forEach(f => rotulo(centro(f), `${esc(f.properties.diretriz ? f.properties.nome : NOMES_TIPO[f.properties.tipo] || f.properties.nome)}<br>${fmt(f.properties.area_m2, 0)} m²`).addTo(rotAreas));
+  // demarcações por nível de zoom, para não poluir: quadras → + áreas → lotes numerados
+  const mostrar = (camada, sim) => sim ? camada.addTo(camadaRotulosMp) : camadaRotulosMp.removeLayer(camada);
+  const atualizar = () => { const z = mapa.getZoom(); mostrar(rotQuadras, z < 18); mostrar(rotAreas, z >= 17); mostrar(rotLotes, z >= 18); };
+  mapa.off("zoomend", desenharMasterplan._z); desenharMasterplan._z = atualizar; mapa.on("zoomend", atualizar); atualizar();
+  if (ajustar) mapa.fitBounds(g.getBounds(), { padding: [30, 30], maxZoom: 18 });
+}
+
+// ---------- IMAGEM DE APRESENTAÇÃO (render 2D sobre o satélite)
+// Desenha o masterplan em canvas, no estilo de prancha de apresentação: satélite de fundo, asfalto com calçada,
+// lotes com divisas, áreas verdes arborizadas, APP sobre a mata, sombras, legenda, norte, escala e quadro de áreas.
+const R_TERRA = 6378137;
+const mercX = (lon, z) => (lon + 180) / 360 * 256 * 2 ** z;
+const mercY = (lat, z) => { const s = Math.sin(lat * Math.PI / 180); return (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * 256 * 2 ** z; };
+function carregarImagem(url) {
+  return new Promise(ok => { const im = new Image(); im.crossOrigin = "anonymous"; im.onload = () => ok(im); im.onerror = () => ok(null); im.src = url; });
+}
+function aleatorio(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
+function dentroPoligono([x, y], anel) {
+  let d = false;
+  for (let i = 0, j = anel.length - 1; i < anel.length; j = i++) {
+    const [xi, yi] = anel[i], [xj, yj] = anel[j];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) d = !d;
+  }
+  return d;
+}
+async function gerarImagemApresentacao(m, { largura = 2400, titulo = "Masterplan preliminar", subtitulo = "" } = {}) {
+  const feats = m.features;
+  let lo0 = 180, lo1 = -180, la0 = 90, la1 = -90;
+  const anéis = f => f.geometry.type === "Polygon" ? [f.geometry.coordinates] : f.geometry.type === "MultiPolygon" ? f.geometry.coordinates : [];
+  feats.forEach(f => anéis(f).forEach(pg => pg[0].forEach(([lo, la]) => { lo0 = Math.min(lo0, lo); lo1 = Math.max(lo1, lo); la0 = Math.min(la0, la); la1 = Math.max(la1, la); })));
+  // margem de contexto ao redor (30% da maior dimensão)
+  const mlo = (lo1 - lo0) * .3 + 0.0006, mla = (la1 - la0) * .3 + 0.0006;
+  lo0 -= mlo; lo1 += mlo; la0 -= mla; la1 += mla;
+  const areaMapa = largura - 520;  // faixa da direita: legenda e quadro
+  let z = 19; while (z > 12 && (mercX(lo1, z) - mercX(lo0, z)) > areaMapa * 1.4) z--;
+  const x0 = mercX(lo0, z), wPx = mercX(lo1, z) - x0;
+  const esc = areaMapa / wPx, altura = Math.max(Math.round((mercY(la0, z) - mercY(la1, z)) * esc), 1350);
+  // altura mínima da prancha: amplia o recorte verticalmente, centrado no projeto
+  const hPx = altura / esc, y0 = (mercY(la1, z) + mercY(la0, z)) / 2 - hPx / 2;
+  const canvas = document.createElement("canvas"); canvas.width = largura; canvas.height = altura;
+  const ctx = canvas.getContext("2d");
+  const P = ([lo, la]) => [(mercX(lo, z) - x0) * esc, (mercY(la, z) - y0) * esc];
+  const latC = (la0 + la1) / 2, mPorPx = 2 * Math.PI * R_TERRA * Math.cos(latC * Math.PI / 180) / (256 * 2 ** z) / esc;
+  const m2px = mtr => mtr / mPorPx;
+
+  // 1) satélite (Esri World Imagery); sem acesso, fundo neutro
+  ctx.fillStyle = "#dfe3da"; ctx.fillRect(0, 0, areaMapa, altura);
+  const URL_SAT = (zz, ty, tx) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zz}/${ty}/${tx}`;
+  async function bloco(tx, ty) {  // tenta de novo e, se faltar, usa o bloco do nível de zoom acima
+    let im = await carregarImagem(URL_SAT(z, ty, tx)) || await carregarImagem(URL_SAT(z, ty, tx) + "?t=1");
+    if (im) return { im, sx: 0, sy: 0, sw: 256 };
+    const pai = await carregarImagem(URL_SAT(z - 1, ty >> 1, tx >> 1));
+    return pai ? { im: pai, sx: (tx & 1) * 128, sy: (ty & 1) * 128, sw: 128 } : null;
+  }
+  const tiles = [];
+  for (let tx = Math.floor(x0 / 256); tx <= Math.floor((x0 + wPx) / 256); tx++)
+    for (let ty = Math.floor(y0 / 256); ty <= Math.floor((y0 + hPx) / 256); ty++)
+      tiles.push(bloco(tx, ty).then(b => ({ b, tx, ty })));
+  let falhas = 0;
+  const lista = await Promise.all(tiles);
+  for (const { b, tx, ty } of lista) {
+    if (!b) { falhas++; continue; }
+    ctx.drawImage(b.im, b.sx, b.sy, b.sw, b.sw, (tx * 256 - x0) * esc, (ty * 256 - y0) * esc, 256 * esc + 1, 256 * esc + 1);
+  }
+  const satelite = falhas < lista.length / 2;
+  // leve dessaturação do entorno para o projeto se destacar
+  ctx.fillStyle = "rgba(255,255,255,.12)"; ctx.fillRect(0, 0, areaMapa, altura);
+
+  const caminho = f => { const p = new Path2D(); anéis(f).forEach(pg => pg.forEach(anel => anel.forEach((c, i) => { const [x, y] = P(c); i ? p.lineTo(x, y) : p.moveTo(x, y); }) || p.closePath())); return p; };
+  const doTipo = t => feats.filter(f => f.properties.tipo === t);
+  const sombra = (blur, dy) => { ctx.shadowColor = "rgba(0,0,0,.35)"; ctx.shadowBlur = blur; ctx.shadowOffsetX = dy * .6; ctx.shadowOffsetY = dy; };
+  const semSombra = () => { ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetX = ctx.shadowOffsetY = 0; };
+
+  // curvas de nível sobre o satélite (mestras mais marcadas, com cota)
+  (m.curvas_nivel || []).forEach(f => {
+    const cs = f.geometry.type === "LineString" ? [f.geometry.coordinates] : f.geometry.coordinates;
+    ctx.strokeStyle = f.properties.mestra ? "rgba(255,236,200,.85)" : "rgba(255,236,200,.45)"; ctx.lineWidth = f.properties.mestra ? 2.2 : 1.1;
+    cs.forEach(ln => { ctx.beginPath(); ln.forEach((c, i) => { const [x, y] = P(c); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke(); });
+  });
+  // 2) APP / fundo de vale: mata do satélite visível, com véu verde e limite tracejado
+  doTipo("app").forEach(f => { const p = caminho(f); ctx.fillStyle = "rgba(46,125,50,.28)"; ctx.fill(p, "evenodd");
+    ctx.setLineDash([m2px(4), m2px(3)]); ctx.strokeStyle = "rgba(200,255,200,.95)"; ctx.lineWidth = Math.max(2, m2px(.8)); ctx.stroke(p); ctx.setLineDash([]); });
+  // 3) vias: calçada clara por baixo, asfalto por cima, meio-fio
+  const vias = doTipo("via");
+  sombra(m2px(2), m2px(.6));
+  vias.forEach(f => { ctx.fillStyle = "#d8d3c8"; ctx.fill(caminho(f), "evenodd"); });
+  semSombra();
+  vias.forEach(f => { const p = caminho(f); ctx.save(); ctx.clip(p, "evenodd");
+    ctx.strokeStyle = "#4b4f55"; ctx.lineWidth = m2px(f.properties.diretriz ? 14 : 9); ctx.lineJoin = "round"; ctx.stroke(p);  // asfalto interno
+    ctx.restore(); });
+  vias.forEach(f => { const p = caminho(f); ctx.save(); ctx.clip(p, "evenodd"); ctx.fillStyle = "#555a60"; ctx.globalAlpha = .9;
+    ctx.fill(p, "evenodd"); ctx.globalAlpha = 1; ctx.strokeStyle = "#d8d3c8"; ctx.lineWidth = m2px(6); ctx.stroke(p); ctx.restore(); });  // calçadas nas bordas
+  // 4) lotes: gramado claro com divisas brancas e sombra
+  const lotes = doTipo("lote");
+  sombra(m2px(1.5), m2px(.5));
+  lotes.forEach((f, i) => { ctx.fillStyle = ["#cfe0a7", "#c8db9e", "#d5e5ae"][i % 3]; ctx.fill(caminho(f)); });
+  semSombra();
+  lotes.forEach(f => { ctx.strokeStyle = "rgba(255,255,255,.95)"; ctx.lineWidth = Math.max(1.2, m2px(.35)); ctx.stroke(caminho(f)); });
+  // 5) institucional e remanescente
+  doTipo("institucional").forEach(f => { const p = caminho(f); sombra(m2px(1.5), m2px(.5)); ctx.fillStyle = "#ead7b0"; ctx.fill(p, "evenodd"); semSombra();
+    ctx.save(); ctx.clip(p, "evenodd"); ctx.strokeStyle = "rgba(160,110,40,.25)"; ctx.lineWidth = m2px(.4);
+    for (let k = -altura; k < largura; k += m2px(3)) { ctx.beginPath(); ctx.moveTo(k, 0); ctx.lineTo(k + altura, altura); ctx.stroke(); } ctx.restore();
+    ctx.strokeStyle = "#fff"; ctx.lineWidth = Math.max(1.5, m2px(.4)); ctx.stroke(p); });
+  doTipo("remanescente").forEach(f => { ctx.fillStyle = "rgba(235,235,225,.75)"; ctx.fill(caminho(f), "evenodd"); });
+  // 6) áreas verdes: gramado e árvores (copa com sombra e brilho)
+  const rnd = aleatorio(20261112);
+  doTipo("area_verde").forEach(f => {
+    const p = caminho(f); ctx.fillStyle = "#86b85a"; ctx.fill(p, "evenodd");
+    ctx.save(); ctx.clip(p, "evenodd");
+    const anel = anéis(f)[0][0].map(P), xs = anel.map(q => q[0]), ys = anel.map(q => q[1]);
+    const area = f.properties.area_m2 || 0, n = Math.min(900, Math.round(area / 45));
+    for (let k = 0, t = 0; k < n && t < n * 6; t++) {
+      const q = [Math.min(...xs) + rnd() * (Math.max(...xs) - Math.min(...xs)), Math.min(...ys) + rnd() * (Math.max(...ys) - Math.min(...ys))];
+      if (!dentroPoligono(q, anel)) continue; k++;
+      const r = m2px(2.2 + rnd() * 2.3);
+      ctx.fillStyle = "rgba(0,0,0,.28)"; ctx.beginPath(); ctx.arc(q[0] + r * .35, q[1] + r * .45, r, 0, 7); ctx.fill();
+      const g = ctx.createRadialGradient(q[0] - r * .35, q[1] - r * .35, r * .1, q[0], q[1], r);
+      g.addColorStop(0, ["#9ccc65", "#8bc34a", "#7cb342"][k % 3]); g.addColorStop(1, ["#33691e", "#2e5e1b", "#3b6e22"][k % 3]);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q[0], q[1], r, 0, 7); ctx.fill();
+    }
+    ctx.restore();
+    ctx.strokeStyle = "rgba(255,255,255,.9)"; ctx.lineWidth = Math.max(1.5, m2px(.4)); ctx.stroke(p);
+  });
+  // 7) perímetro do imóvel
+  const r = estado.matricula;
+  if (r?.geojson) {
+    const p = new Path2D(); r.geojson.geometry.coordinates[0].forEach((c, i) => { const [x, y] = P(c); i ? p.lineTo(x, y) : p.moveTo(x, y); }); p.closePath();
+    ctx.strokeStyle = "rgba(0,0,0,.45)"; ctx.lineWidth = Math.max(5, m2px(1.4)); ctx.stroke(p);
+    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = Math.max(2.5, m2px(.7)); ctx.setLineDash([m2px(5), m2px(2.5)]); ctx.stroke(p); ctx.setLineDash([]);
+  }
+  // 8) rótulos das quadras e das vias previstas
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  const quadras = {};
+  lotes.forEach(f => (quadras[f.properties.quadra] ||= []).push(f));
+  const etiqueta = (x, y, txt, fundo = "rgba(49,85,104,.88)") => {
+    ctx.font = `700 ${Math.max(18, Math.min(30, m2px(3.2)))}px Inter, Arial, sans-serif`;
+    const w = ctx.measureText(txt).width + 18, h = Math.max(28, Math.min(42, m2px(4.6)));
+    ctx.fillStyle = fundo; ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h, 8); ctx.fill();
+    ctx.fillStyle = "#fff"; ctx.fillText(txt, x, y + 1);
+  };
+  Object.entries(quadras).forEach(([q, fs]) => {
+    const pts = fs.flatMap(f => anéis(f)[0][0]).map(P);
+    etiqueta(pts.reduce((a, c) => a + c[0], 0) / pts.length, pts.reduce((a, c) => a + c[1], 0) / pts.length, q, "rgba(20,45,58,.92)");
+  });
+  vias.filter(f => f.properties.diretriz && f.properties.area_m2 > 300).forEach(f => {
+    const pts = anéis(f)[0][0].map(P); etiqueta(pts.reduce((a, c) => a + c[0], 0) / pts.length, pts.reduce((a, c) => a + c[1], 0) / pts.length, f.properties.nome);
+  });
+
+  // 9) painel lateral: título, legenda, quadro de áreas, norte e escala
+  const X = areaMapa;
+  ctx.fillStyle = "#142D3A"; ctx.fillRect(X, 0, largura - X, altura);
+  ctx.fillStyle = "#C6A66B"; ctx.fillRect(X, 0, 6, altura);
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  let y = 90;
+  const logo = await carregarImagem("assets/logo.png");
+  if (logo) {
+    const lw = 190, lh = lw * logo.height / logo.width;
+    ctx.fillStyle = "#FFFFFF"; ctx.beginPath(); ctx.roundRect(X + 44, 36, lw + 28, lh + 24, 12); ctx.fill();
+    ctx.drawImage(logo, X + 58, 48, lw, lh);
+    y = 36 + lh + 24 + 64;
+  }
+  ctx.fillStyle = "#fff"; ctx.font = "600 40px Inter, Arial, sans-serif"; ctx.fillText(titulo, X + 50, y);
+  y += 44; ctx.fillStyle = "#A9BDC7"; ctx.font = "500 24px Inter, Arial, sans-serif";
+  (subtitulo || "").split("\n").forEach(l => { ctx.fillText(l, X + 50, y); y += 32; });
+  y += 30;
+  const leg = [["#cfe0a7", "Lotes"], ["#555a60", "Sistema viário"], ["#86b85a", "Área verde / praça"], ["#ead7b0", "Área institucional"],
+    ["rgba(46,125,50,.6)", "APP / fundo de vale"], ["#ffffff", "Perímetro do imóvel"]].concat(m.curvas_nivel?.length ? [["rgba(255,236,200,.9)", `Curvas de nível (${fmt(m.resumo.relevo?.intervalo_curvas_m || 0, 0)} m)`]] : []);
+  ctx.font = "600 24px Inter, Arial, sans-serif";
+  leg.forEach(([cor, nome]) => { ctx.fillStyle = cor; ctx.beginPath(); ctx.roundRect(X + 50, y - 22, 34, 26, 5); ctx.fill(); ctx.fillStyle = "#E6EDF0"; ctx.fillText(nome, X + 100, y); y += 44; });
+  y += 20; ctx.strokeStyle = "rgba(255,255,255,.14)"; ctx.beginPath(); ctx.moveTo(X + 50, y); ctx.lineTo(largura - 50, y); ctx.stroke(); y += 50;
+  const rs = m.resumo, linhas = [["Área do imóvel", `${fmt(rs.area_gleba_m2, 0)} m²`], ["Lotes", `${rs.numero_lotes}`], ["Lote médio", `${fmt(rs.lote_medio_m2, 0)} m²`],
+    ["Lotes (% da área)", `${fmt(rs.pct_lotes, 1)}%`], ["Sistema viário", `${fmt(rs.pct_vias, 1)}%`], ["Área verde", `${fmt(rs.pct_verde, 1)}%`],
+    ["Institucional", `${fmt(rs.pct_institucional, 1)}%`], ["APP / fundo de vale", `${fmt(rs.area_app_m2, 0)} m²`]]
+    .concat(rs.relevo?.cota_min_m != null ? [["Cotas do terreno", `${fmt(rs.relevo.cota_min_m, 0)}–${fmt(rs.relevo.cota_max_m, 0)} m`], ["Declividade média", `${fmt(rs.relevo.declividade_media_pct, 1)}%`]] : []);
+  linhas.forEach(([k, v]) => { ctx.fillStyle = "#A9BDC7"; ctx.font = "500 24px Inter, Arial, sans-serif"; ctx.fillText(k, X + 50, y);
+    ctx.fillStyle = "#fff"; ctx.font = "700 26px Inter, Arial, sans-serif"; ctx.textAlign = "right"; ctx.fillText(v, largura - 50, y); ctx.textAlign = "left"; y += 44; });
+  // norte
+  const ny = Math.max(y + 90, altura - 230), nx = X + 110;
+  ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.moveTo(nx, ny - 50); ctx.lineTo(nx + 22, ny + 20); ctx.lineTo(nx, ny + 6); ctx.lineTo(nx - 22, ny + 20); ctx.closePath(); ctx.fill();
+  ctx.font = "700 28px Inter, Arial"; ctx.textAlign = "center"; ctx.fillText("N", nx, ny + 58); ctx.textAlign = "left";
+  // escala gráfica
+  const passo = [10, 20, 25, 50, 100, 200, 250, 500].find(v => m2px(v) > 120) || 500, wE = m2px(passo);
+  const ex = X + 200, ey = ny + 30;
+  ctx.fillStyle = "#fff"; ctx.fillRect(ex, ey, wE / 2, 12); ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.strokeRect(ex, ey, wE, 12);
+  ctx.font = "500 22px Inter, Arial"; ctx.fillText("0", ex - 6, ey + 42); ctx.fillText(`${passo} m`, ex + wE - 20, ey + 42);
+  ctx.fillStyle = "#8FA6B1"; ctx.font = "500 19px Inter, Arial";
+  ["Estudo preliminar de massa — não substitui projeto", "urbanístico aprovado. Imagem: " + (satelite ? "Esri World Imagery." : "satélite indisponível."),
+    `Inteligência Urbana · ${new Date().toLocaleDateString("pt-BR")}`].forEach((l, i) => ctx.fillText(l, X + 50, Math.max(ey + 90, altura - 110) + i * 28));
+  return { canvas, satelite };
+}
+async function mostrarImagemApresentacao(m, alvo) {
+  carregando(alvo, "Gerando a imagem de apresentação (baixando o satélite)…");
+  const r = estado.matricula, d = r?.diretrizes;
+  const sub = [r?.numero && `Matrícula ${r.numero}`, r?.lote && `Lote ${r.lote}${r.quadra ? " · Quadra " + r.quadra : ""}`,
+    r?.loteamento, d && `Diretrizes IPPUL — CPS ${d.numero_consulta}`].filter(Boolean).join("\n");
+  const { canvas, satelite } = await gerarImagemApresentacao(m, { subtitulo: sub });
+  let url = null;
+  try { url = canvas.toDataURL("image/png"); } catch {}
+  if (!url) return erro(alvo, "O navegador bloqueou a composição com o satélite. Tente novamente ou use outro navegador.");
+  $(alvo).innerHTML = `<div class="card"><h2>Imagem de apresentação</h2>
+    ${satelite ? "" : `<div class="alerta">Não foi possível baixar o satélite: a imagem saiu com fundo neutro (tente gerar de novo).</div>`}
+    <img src="${url}" alt="Masterplan sobre satélite" style="width:100%;border-radius:10px;border:1px solid var(--line)">
+    <a class="btn" href="${url}" download="masterplan_apresentacao.png">Baixar PNG (${canvas.width} × ${canvas.height})</a></div>`;
+}
+
+// ---------- NOVO ESTUDO (passo a passo)
+const wz = { etapa: 1, diretrizes: null };
+function wzStatus(n, txt, feita) {
+  const card = $("#wz-" + n); card.classList.toggle("feita", !!feita);
+  $(`#wz-${n}-st`).textContent = txt;
+}
+function wzLiberar(n, sim) { $("#wz-" + n).classList.toggle("bloqueada", !sim); }
+// chamado a cada renderização do imóvel: a etapa 1 só conclui com o imóvel contornado no mapa
+function wzAtualizar() {
+  const r = estado.matricula;
+  if (!r || !$("#wz-1")) return;
+  const contornado = !!r.geojson;
+  wzStatus(1, contornado ? "Concluída" : "Falta o contorno", contornado);
+  wzLiberar(2, contornado);
+  if (!contornado) { wzLiberar(3, false); wzStatus(2, ""); }
+  if ($("#wz-mat-res") && r === wz.matricula) $("#wz-mat-res").innerHTML = wzResumoMatricula(r);
+}
+function wzResumoMatricula(r) {
+  const onus = r.atos.filter(a => a.onus && a.situacao.startsWith("ativo")).length;
+  const ref = areaReferencia(r);
+  const linhas = [["Matrícula", r.numero], ["Imóvel", [r.unidade_autonoma?.unidade, r.lote && `lote ${r.lote}`, r.quadra && `quadra ${r.quadra}`, r.loteamento].filter(Boolean).join(", ")],
+    ["Endereço", r.endereco], ["Área", ref && `${fmt(ref)} m²${r.unidade_autonoma ? " (terreno do condomínio)" : ""}`],
+    ["Contorno no mapa", r.geojson ? `${fmt(r.area_calculada_m2)} m² — ${r.datum || ""}` : "pendente"]].filter(x => x[1]);
+  return `<div class="kpis" style="margin-top:14px">
+      <div class="kpi"><small>Atos</small><b>${r.atos.length}</b></div><div class="kpi"><small>Ônus ativos</small><b>${onus}</b></div>
+      <div class="kpi"><small>Alertas</small><b>${r.alertas.length}</b></div></div>
+    <table style="margin-top:8px">${linhas.map(([k, v]) => `<tr><th>${k}</th><td>${esc(v)}</td></tr>`).join("")}</table>
+    ${r.geojson ? `<p class="muted" style="margin-top:8px">Confira no satélite se o contorno está no lugar certo. ${r.posicao ? "Ajuste arrastando o marcador ✥ ou com os botões abaixo." : ""}</p><div id="wz-ajuste">${r.posicao ? controlesPosicao(r) : ""}</div>`
+      : `<div class="alerta">A matrícula não permitiu montar o contorno automaticamente. Abra a aba <b>Matrícula</b> e use <b>Contornar terreno</b>; depois volte aqui.</div>`}
+    <button class="btn sec" id="wz-ver-mat">Ver análise completa da matrícula</button>`;
+}
+$("#wz-mat-ir").onclick = async () => {
+  const arq = $("#wz-mat-arq").files[0];
+  if (!arq) return erro("#wz-mat-res", "Escolha o PDF da matrícula.");
+  try {
+    wz.diretrizes = null; wzLiberar(3, false); wzStatus(2, ""); wzStatus(3, ""); $("#wz-dir-res").innerHTML = ""; $("#wz-mp-res").innerHTML = "";
+    const r = await analisarMatricula({ arq, aviso: t => carregando("#wz-mat-res", t) });
+    wz.matricula = r;
+    wzAtualizar();
+    if (r.geojson) ligarControlesPosicao(r);
+    $("#wz-ver-mat").onclick = () => document.querySelector('[data-aba="matricula"]').click();
+  } catch (e) { erro("#wz-mat-res", e); }
 };
+// a localização/contorno automático termina depois da análise: atualiza o resumo quando ficar pronto
+const _renderMatricula = renderMatricula;
+renderMatricula = function (r) {
+  _renderMatricula(r);
+  if (wz.matricula === r && $("#wz-mat-res") && !$("#wz-mat-res").querySelector(".muted:only-child")) {
+    $("#wz-mat-res").innerHTML = wzResumoMatricula(r);
+    if ($("#wz-ver-mat")) $("#wz-ver-mat").onclick = () => document.querySelector('[data-aba="matricula"]').click();
+    if (r.geojson) ligarControlesPosicao(r);
+  }
+};
+$("#wz-dir-ir").onclick = async () => {
+  const arq = $("#wz-dir-arq").files[0];
+  if (!estado.matricula?.geojson) return erro("#wz-dir-res", "Conclua a etapa 1 (matrícula com o imóvel contornado no mapa).");
+  if (!arq) return erro("#wz-dir-res", "Escolha o PDF da consulta do IPPUL.");
+  try {
+    const d = await analisarDiretrizes({ arq, aviso: t => carregando("#wz-dir-res", t), vincularMatricula: true });
+    wz.diretrizes = d;
+    const c = d.caracterizacao || {};
+    $("#wz-dir-res").innerHTML = `<table style="margin-top:12px">
+        ${[["Consulta", `CPS ${d.numero_consulta || "—"}`], ["Lote / gleba", [c.lote, c.gleba].filter(Boolean).join(" — ")], ["Área total", c.area_total_m2 && `${fmt(c.area_total_m2)} m²`],
+          ["Zonas", d.zonas.join(", ")], ["Vias previstas", d.vias.map(v => `${v.via} ${v.hierarquia.toLowerCase()} ${fmt(v.largura_total_m, 0)} m`).join("; ")],
+          ["Áreas públicas", d.parametros.areas_publicas_min_pct && `${fmt(d.parametros.areas_publicas_min_pct, 0)}%`], ["Croqui", d.croqui ? "encaixado sobre o imóvel" : "não encontrado no PDF"]]
+          .filter(x => x[1]).map(([k, v]) => `<tr><th>${k}</th><td>${esc(v)}</td></tr>`).join("")}</table>
+      ${alertasHTML(estado.matricula.alertas.filter(a => a.startsWith("Área da consulta")))}
+      <button class="btn sec" id="wz-ver-dir">Ver diretrizes completas</button>`;
+    $("#wz-ver-dir").onclick = () => document.querySelector('[data-aba="diretrizes"]').click();
+    wzStatus(2, "Concluída", true);
+    await wzGerarMasterplan();
+  } catch (e) { erro("#wz-dir-res", e); }
+};
+async function wzGerarMasterplan() {
+  wzLiberar(3, true); wzStatus(3, "Gerando…");
+  carregando("#wz-mp-res", "Gerando o masterplan com as diretrizes…");
+  try {
+    const m = await gerarMasterplan();
+    $("#wz-mp-res").innerHTML = `${alertasHTML(m.alertas)}
+      <p class="muted" style="margin:0 0 10px">${$("#mp-origem").innerHTML}</p>
+      ${quadroMasterplan(m.resumo)}
+      <div class="mp-svg" style="margin-top:12px">${m.svg}</div>
+      <p class="muted">No mapa: quadras e áreas identificadas; aproxime o zoom para ver o número e a área de cada lote.</p>
+      <button class="btn" id="wz-mp-kml">Baixar KML (Google Earth)</button><button class="btn sec" id="wz-mp-via">Levar para viabilidade</button>
+      <button class="btn sec" id="wz-mp-refazer">Gerar de novo</button><button class="btn sec" id="wz-mp-param">Ajustar parâmetros</button>
+      <button class="btn" id="wz-mp-img">Gerar imagem de apresentação</button><div id="wz-mp-img-res" style="margin-top:12px"></div>`;
+    $("#wz-mp-img").onclick = () => mostrarImagemApresentacao(m, "#wz-mp-img-res");
+    $("#wz-mp-kml").onclick = () => baixarKmlMasterplan(m);
+    $("#wz-mp-via").onclick = () => levarParaViabilidade(m);
+    $("#wz-mp-refazer").onclick = wzGerarMasterplan;
+    $("#wz-mp-param").onclick = () => document.querySelector('[data-aba="masterplan"]').click();
+    wzStatus(3, "Concluída", true);
+  } catch (e) { wzStatus(3, "Erro"); erro("#wz-mp-res", e); }
+}
+
+// ---------- ANALISADOR DE MATRÍCULA (Fases 1–3: envio, leitura integral rastreável, registros e averbações)
+const AZ_NI = "Não identificado no documento analisado.";
+const az = { atual: null, arquivos: [] };
+const AZ_PASSOS = ["Leitura do documento", "Identificação do número da matrícula", "Identificação do cartório e comarca",
+  "Identificação da data de emissão", "Extração integral do conteúdo", "Separação dos registros (R) e averbações (AV)",
+  "Organização cronológica dos atos", "Análise individual de cada ato", "Cruzamento das informações", "Geração do relatório"];
+const AZ_PROXIMAS = { 7: "Fases 4–5", 8: "Fase 7", 9: "Fase 10" };  // índices de AZ_PASSOS ainda em desenvolvimento
+const dataBR = iso => iso ? iso.split("-").reverse().join("/") : null;
+
+// armazenamento local (IndexedDB) — cada navegador guarda só as próprias análises
+const azDB = (() => { let p; return () => p ||= new Promise((ok, falha) => {
+  const r = indexedDB.open("iu-analisador", 1);
+  r.onupgradeneeded = () => r.result.createObjectStore("analises", { keyPath: "id" });
+  r.onsuccess = () => ok(r.result); r.onerror = () => falha(r.error);
+}); })();
+async function azTx(modo, fn) {
+  const db = await azDB();
+  return new Promise((ok, falha) => { const tx = db.transaction("analises", modo); const r = fn(tx.objectStore("analises")); tx.oncomplete = () => ok(r?.result); tx.onerror = () => falha(tx.error); });
+}
+const azSalvar = a => azTx("readwrite", st => st.put(a)).catch(() => {});
+const azListar = () => azTx("readonly", st => st.getAll()).catch(() => []);
+const azApagar = id => azTx("readwrite", st => st.delete(id));
+
+// ---- envio
+function azEscolher(files) {
+  // PDFs primeiro; depois as imagens, cada uma uma página, em ordem de nome
+  const nome = (a, b) => a.name.localeCompare(b.name, "pt-BR", { numeric: true });
+  const lista = [...files].filter(f => /\.(pdf|jpe?g|png)$/i.test(f.name));
+  az.arquivos = [...lista.filter(f => /\.pdf$/i.test(f.name)).sort(nome), ...lista.filter(f => !/\.pdf$/i.test(f.name)).sort(nome)];
+  $("#az-arqs").innerHTML = az.arquivos.length ? `<p style="margin:10px 0 0">${az.arquivos.map(f => `${esc(f.name)} <span class="muted">(${fmt(f.size / 1024, 0)} KB)</span>`).join("<br>")}</p>` : "";
+  $("#az-ir").disabled = !az.arquivos.length;
+}
+$("#az-arq").onchange = e => azEscolher(e.target.files);
+const zona = $("#az-drop");
+["dragenter", "dragover"].forEach(ev => zona.addEventListener(ev, e => { e.preventDefault(); zona.classList.add("sobre"); }));
+["dragleave", "drop"].forEach(ev => zona.addEventListener(ev, e => { e.preventDefault(); zona.classList.remove("sobre"); }));
+zona.addEventListener("drop", e => azEscolher(e.dataTransfer.files));
+
+function azPassos(atual, detalhe = "") {
+  $("#az-passos").innerHTML = AZ_PASSOS.map((p, i) => `<li class="${i < atual ? "feito" : i === atual ? "atual" : ""}">${p}${
+    i === atual && detalhe ? `<small>${esc(detalhe)}</small>` : AZ_PROXIMAS[i] && i > atual ? `<small>${AZ_PROXIMAS[i]}</small>` : ""}</li>`).join("");
+}
+async function azMiniatura(fonte, largura = 1100) {
+  const c = document.createElement("canvas"), k = largura / fonte.width;
+  c.width = largura; c.height = Math.round(fonte.height * k);
+  c.getContext("2d").drawImage(fonte, 0, 0, c.width, c.height);
+  return c.toDataURL("image/jpeg", .72);
+}
+async function azOCR(canvas, rotulo, aviso) {
+  const w = await workerOCR(aviso); workerOCR.pagina = rotulo;
+  const { data } = await w.recognize(canvas);
+  return { texto: data.text, confianca: Math.round(data.confidence) };
+}
+// lê cada página: texto do PDF quando existe; senão OCR com confiança; guarda uma imagem para conferência
+async function azLerPaginas(arquivos, aviso) {
+  const paginas = [];
+  for (const arq of arquivos) {
+    if (/\.pdf$/i.test(arq.name)) {
+      const lib = await carregarPdfJs();
+      const pdf = await lib.getDocument({ data: await arq.arrayBuffer() }).promise;
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const n = paginas.length + 1;
+        aviso(`página ${n} (${arq.name}, ${i}/${pdf.numPages})`);
+        const pg = await pdf.getPage(i);
+        const c = await pg.getTextContent();
+        let texto = c.items.map(it => it.str + (it.hasEOL ? "\n" : " ")).join(""), metodo = "texto", confianca = null;
+        const vp = pg.getViewport({ scale: 3 }), canvas = document.createElement("canvas");
+        canvas.width = vp.width; canvas.height = vp.height;
+        await pg.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
+        if (conteudoUtil(texto) < 50) {  // página escaneada (ou só com carimbo digital): OCR
+          const r = await azOCR(canvas, `${n}`, aviso);
+          texto = r.texto; confianca = r.confianca; metodo = "ocr";
+        }
+        paginas.push({ numero: n, texto, metodo, confianca, imagem: await azMiniatura(canvas) });
+        canvas.width = canvas.height = 0;
+      }
+    } else {
+      const n = paginas.length + 1;
+      aviso(`página ${n} (${arq.name}) — OCR`);
+      const img = await new Promise((ok, falha) => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => falha(new Error(`Imagem ilegível: ${arq.name}`)); im.src = URL.createObjectURL(arq); });
+      const canvas = document.createElement("canvas"); canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+      canvas.getContext("2d").drawImage(img, 0, 0);
+      const { texto, confianca } = await azOCR(canvas, `${n}`, aviso);
+      paginas.push({ numero: n, texto, metodo: "ocr", confianca, imagem: await azMiniatura(canvas) });
+    }
+  }
+  return paginas;
+}
+$("#az-ir").onclick = async () => {
+  $("#az-prog-card").hidden = false; $("#az-ir").disabled = true;
+  try {
+    azPassos(0, "carregando…");
+    const paginas = await azLerPaginas(az.arquivos, t => azPassos(0, t));
+    azPassos(4, `${paginas.length} página(s)`);
+    const ext = await postJSON("api/analisador/extrair", { arquivo: az.arquivos.map(f => f.name).join(", "),
+      paginas: paginas.map(({ numero, texto, metodo, confianca }) => ({ numero, texto, metodo, confianca })) });
+    azPassos(7);
+    const a = { id: Date.now(), criado_em: new Date().toISOString(), arquivo: az.arquivos.map(f => f.name).join(", "), paginas, extracao: ext, correcoes: [] };
+    await azSalvar(a);
+    az.atual = a;
+    document.querySelector('[data-aba="az-dashboard"]').click();
+  } catch (e) { $("#az-passos").insertAdjacentHTML("afterend", `<div class="alerta">${esc(e.message || e)}</div>`); }
+  finally { $("#az-ir").disabled = !az.arquivos.length; }
+};
+
+// ---- componentes de exibição
+const azRef = (fonte, rotulo) => fonte && fonte.pagina ? `<button class="az-ref" data-pag="${fonte.pagina}" data-trecho="${esc(fonte.trecho || "")}" title="Ver o trecho original">${rotulo || "pág. " + fonte.pagina}</button>` : "";
+function azInd(rotulo, campo, formato = v => esc(v), proxima = null) {
+  const v = campo?.valor;
+  const corpo = v != null && v !== "" ? `<b>${formato(v)}</b>${azRef(campo.fonte)}` : proxima ? `<b class="nao">Disponível na ${proxima}</b>` : `<b class="nao">${AZ_NI}</b>`;
+  return `<div class="az-ind"><small>${rotulo}</small>${corpo}</div>`;
+}
+function azLigarRefs(raiz = document) {
+  raiz.querySelectorAll(".az-ref").forEach(b => b.onclick = () => azVer(+b.dataset.pag, b.dataset.trecho));
+}
+function azSemAnalise(alvo) {
+  $(alvo).innerHTML = `<div class="card"><h2>Nenhuma análise aberta</h2><p class="muted">Faça uma <b>Nova análise</b> ou abra uma das <b>Matrículas analisadas</b>.</p>
+    <button class="btn" onclick="document.querySelector('[data-aba=az-nova]').click()">Nova análise</button></div>`;
+}
+const azAtos = () => az.atual.extracao.atos;
+function azAtoLinha(a) {
+  const data = a.data ? `${dataBR(a.data)}${a.data_origem && a.data_origem !== "texto do ato" ? ` <span class="muted">(${esc(a.data_origem)})</span>` : ""}` : `<span class="muted">${AZ_NI}</span>`;
+  const conf = a.confianca != null ? ` <span class="muted">· OCR ${a.confianca}%</span>` : "";
+  return `<tr><td style="white-space:nowrap"><b>${a.id}</b><div class="muted">${a.tipo === "R" ? "Registro" : "Averbação"}</div></td><td>${data}</td>
+    <td>${a.categorias.map(c => `<span class="tag">${esc(c)}</span>`).join("")}</td>
+    <td style="white-space:nowrap">${a.paginas.map(p => azRef({ pagina: p, trecho: a.fonte.trecho }, "pág. " + p)).join("")}${conf}</td></tr>`;
+}
+
+// ---- dashboard
+function azDashboard() {
+  const a = az.atual; if (!a) return azSemAnalise("#az-dash");
+  const e = a.extracao, i = e.identificacao, s = e.estatisticas, q = e.sequencia;
+  const ultimoR = e.atos.filter(x => x.tipo === "R" && x.data).sort((x, y) => x.data.localeCompare(y.data)).pop();
+  const ultimos = [...e.atos].sort((x, y) => y.numero - x.numero).slice(0, 5);
+  $("#az-dash").innerHTML = `
+    <div class="card"><h2>${esc(i.numero_matricula.valor ? "Matrícula " + i.numero_matricula.valor : "Matrícula sem número identificado")}</h2>
+      <p class="muted" style="margin:0">${esc(a.arquivo)} · analisada em ${new Date(a.criado_em).toLocaleString("pt-BR")} · ${s.paginas} página(s)${s.paginas_ocr ? `, ${s.paginas_ocr} por OCR (confiança média ${fmt(s.confianca_media_ocr, 0)}%)` : ""}</p>
+      <div class="az-sit" style="margin-top:12px"><span class="az-niv INFORMATIVO">EM ANÁLISE</span>
+        <span>Análise inconclusiva por enquanto: a cadeia de proprietários (Fase 4) e a situação dos ônus (Fase 5) ainda não são avaliadas. A ausência de ônus nesta tela não significa matrícula regular.</span></div>
+      <button class="btn sec" id="az-ver-doc">Ver documento e texto extraído</button></div>
+    <div class="card"><h2>Identificação</h2><div class="az-grid">
+      ${azInd("Número da matrícula", i.numero_matricula)}${azInd("Cartório de registro", i.cartorio)}${azInd("Comarca", i.comarca)}
+      ${azInd("Município / UF", { valor: [i.municipio.valor, i.uf.valor].filter(Boolean).join(" / ") || null, fonte: i.municipio.fonte })}
+      ${azInd("Área total registrada", null, null, "Fase 6")}${azInd("Tipo de imóvel", null, null, "Fase 6")}
+      ${azInd("Proprietário atual", null, null, "Fase 4")}${azInd("Abertura da matrícula", i.data_abertura, dataBR)}
+      ${azInd("Data do último registro", { valor: ultimoR?.data || null, fonte: ultimoR && { ...ultimoR.fonte, pagina: ultimoR.paginas[0] } }, v => `${dataBR(v)} <span class="muted" style="font-size:12px">(${ultimoR.id})</span>`)}${azInd("Emissão da certidão", i.data_emissao, dataBR)}
+    </div></div>
+    <div class="card"><h2>Atos</h2><div class="az-grid">
+      <div class="az-ind"><small>Registros (R)</small><b>${s.registros}</b></div><div class="az-ind"><small>Averbações (AV)</small><b>${s.averbacoes}</b></div>
+      <div class="az-ind"><small>Último ato lido / certificado</small><b>${q.ultimo_ato_lido ?? "—"} / ${q.ultimo_ato_certificado ?? "—"}</b></div>
+      <div class="az-ind"><small>Atos não localizados</small><b>${q.faltantes.length ? q.faltantes.join(", ") : "nenhum"}</b></div>
+      ${azInd("Ônus identificados", null, null, "Fase 5")}${azInd("Ônus baixados", null, null, "Fase 5")}${azInd("Restrições aparentemente ativas", null, null, "Fase 5")}
+    </div><p class="muted" style="margin:8px 0 0">Numeração ${esc(q.numeracao)}.</p></div>
+    <div class="card"><h2>O que aconteceu por último com este imóvel?</h2>
+      <table><tr><th>Ato</th><th>Data</th><th>Natureza (preliminar)</th><th>Onde</th></tr>${ultimos.map(azAtoLinha).join("") || `<tr><td colspan="4">${AZ_NI}</td></tr>`}</table></div>
+    ${e.alertas.length ? `<div class="card"><h2>Pontos de atenção da leitura</h2>${azAlertasHTML(e.alertas)}</div>` : ""}`;
+  $("#az-ver-doc").onclick = () => azVer(1);
+  azLigarRefs($("#az-dash"));
+}
+const azAlertasHTML = l => `<table>${l.map(x => `<tr><td style="width:110px"><span class="az-niv ${x.nivel}">${x.nivel}</span></td><td>${esc(x.texto)}<div class="muted">Onde: ${esc(x.onde)}</div></td></tr>`).join("")}</table>`;
+
+// ---- histórico registral (linha do tempo de todos os atos)
+function azHistorico() {
+  const a = az.atual; if (!a) return azSemAnalise("#az-hist");
+  const atos = azAtos();
+  $("#az-hist").innerHTML = `<div class="card"><h2>Linha do tempo dos atos (${atos.length})</h2>
+    <p class="muted" style="margin:0 0 10px">Ordem dos atos na matrícula. A explicação de cada ato e a cadeia de proprietários chegam nas Fases 4 e 8.</p>
+    <div class="az-tl">${atos.map(x => `<div class="az-tl-item ${x.tipo}"><b>${x.id}</b> — ${x.tipo === "R" ? "Registro" : "Averbação"}
+      ${x.data ? `· ${dataBR(x.data)}${x.data_origem !== "texto do ato" ? ` (${esc(x.data_origem)})` : ""}` : `· <span class="muted" style="display:inline">${AZ_NI}</span>`}
+      ${x.paginas.map(p => azRef({ pagina: p, trecho: x.fonte.trecho }, "pág. " + p)).join("")}
+      <div>${x.categorias.map(c => `<span class="tag">${esc(c)}</span>`).join("")}</div>
+      <details><summary>Texto original</summary><div class="az-texto">${esc(x.texto_original)}</div></details></div>`).join("") || AZ_NI}</div></div>`;
+  azLigarRefs($("#az-hist"));
+}
+
+// ---- ônus (lista preliminar; a situação de cada um depende da Fase 5)
+const AZ_ONUS = ["hipoteca", "alienação fiduciária", "penhora", "arresto/sequestro", "indisponibilidade", "usufruto", "servidão",
+  "cláusulas restritivas", "averbação premonitória/ação", "compromisso de compra e venda", "tombamento", "enfiteuse/aforamento"];
+function azOnus() {
+  const a = az.atual; if (!a) return azSemAnalise("#az-onus");
+  const cancel = azAtos().filter(x => x.categorias.includes("cancelamento"));
+  const lista = azAtos().filter(x => !x.categorias.includes("cancelamento") && x.categorias.some(c => AZ_ONUS.includes(c)));
+  $("#az-onus").innerHTML = `<div class="card"><h2>Ocorrências com termos de ônus ou restrição</h2>
+    <div class="alerta" style="border-left-color:var(--info);background:var(--info-soft)">Lista preliminar: atos cujo texto menciona um tipo de ônus. A situação individual (ativa, baixada, parcialmente cancelada, histórica) será determinada na Fase 5, vinculando cada constituição ao respectivo ato de cancelamento. Até lá, todas aparecem como <b>PENDENTE DE CONFIRMAÇÃO</b>.</div>
+    <table><tr><th>Ato</th><th>Tipo mencionado</th><th>Situação</th><th>Onde</th></tr>
+    ${lista.map(x => `<tr><td><b>${x.id}</b><div class="muted">${x.data ? dataBR(x.data) : AZ_NI}</div></td><td>${x.categorias.filter(c => AZ_ONUS.includes(c)).map(c => `<span class="tag onus">${esc(c)}</span>`).join("")}</td>
+      <td><span class="az-niv MODERADO">PENDENTE DE CONFIRMAÇÃO</span></td><td>${x.paginas.map(p => azRef({ pagina: p, trecho: x.fonte.trecho }, "pág. " + p)).join("")}</td></tr>`).join("")
+      || `<tr><td colspan="4">Nenhum ato com termos de ônus foi encontrado no texto lido. Isso não comprova a inexistência de ônus.</td></tr>`}</table></div>
+    <div class="card"><h2>Atos de cancelamento encontrados</h2>
+    <p class="muted" style="margin:0 0 8px">Possíveis baixas. Qual ônus cada um cancela, e se o cancelamento é total ou parcial, será verificado na Fase 5.</p>
+    <table>${cancel.map(x => `<tr><td><b>${x.id}</b><div class="muted">${x.data ? dataBR(x.data) : AZ_NI}</div></td><td>${esc(x.texto_original.slice(0, 220))}…</td>
+      <td>${x.paginas.map(p => azRef({ pagina: p, trecho: x.fonte.trecho }, "pág. " + p)).join("")}</td></tr>`).join("") || `<tr><td>Nenhum ato de cancelamento encontrado no texto lido.</td></tr>`}</table></div>`;
+  azLigarRefs($("#az-onus"));
+}
+function azRiscos() {
+  const a = az.atual; if (!a) return azSemAnalise("#az-riscos");
+  $("#az-riscos").innerHTML = `<div class="card"><h2>Pontos de atenção identificados até agora</h2>
+    <p class="muted">Nesta fase, os alertas tratam da leitura do documento (legibilidade, sequência de atos, datas, emissão). O motor de riscos jurídicos chega na Fase 7.</p>
+    ${a.extracao.alertas.length ? azAlertasHTML(a.extracao.alertas) : "<p>Nenhum ponto de atenção de leitura.</p>"}</div>`;
+}
+function azRelatorios() {
+  const a = az.atual; if (!a) return azSemAnalise("#az-rel");
+  $("#az-rel").innerHTML = `<div class="card"><h2>Relatório técnico</h2>
+    <p class="muted">O relatório técnico em PDF chega na Fase 10. Já é possível baixar os dados extraídos, com página, ato e trecho original de cada informação.</p>
+    <button class="btn" id="az-json">Baixar dados extraídos (JSON)</button></div>`;
+  $("#az-json").onclick = () => { const { paginas, ...resto } = a;
+    baixar(new Blob([JSON.stringify({ ...resto, paginas: paginas.map(({ imagem, ...p }) => p) }, null, 2)], { type: "application/json" }), `matricula_${a.extracao.identificacao.numero_matricula.valor || a.id}.json`); };
+}
+async function azLista() {
+  const itens = (await azListar()).sort((x, y) => y.id - x.id);
+  $("#az-lista").innerHTML = itens.length ? `<table><tr><th>Matrícula</th><th>Arquivo</th><th>Analisada em</th><th>Atos</th><th></th></tr>
+    ${itens.map(x => `<tr><td><b>${esc(x.extracao.identificacao.numero_matricula.valor || "—")}</b><div class="muted">${esc(x.extracao.identificacao.cartorio.valor || "")}</div></td>
+      <td>${esc(x.arquivo)}</td><td>${new Date(x.criado_em).toLocaleString("pt-BR")}</td><td>${x.extracao.atos.length}</td>
+      <td style="white-space:nowrap"><button class="btn sec" data-abrir="${x.id}" style="margin:0 4px 0 0">Abrir</button><button class="btn sec" data-apagar="${x.id}" style="margin:0">Apagar</button></td></tr>`).join("")}</table>`
+    : `<p>Nenhuma análise salva neste navegador.</p>`;
+  document.querySelectorAll("[data-abrir]").forEach(b => b.onclick = () => { az.atual = itens.find(x => x.id === +b.dataset.abrir); document.querySelector('[data-aba="az-dashboard"]').click(); });
+  document.querySelectorAll("[data-apagar]").forEach(b => b.onclick = async () => { if (!confirm("Apagar esta análise deste navegador?")) return;
+    await azApagar(+b.dataset.apagar); if (az.atual?.id === +b.dataset.apagar) az.atual = null; azLista(); });
+}
+$("#az-limpar").onclick = async () => { if (!confirm("Apagar todas as análises salvas neste navegador?")) return;
+  for (const x of await azListar()) await azApagar(x.id); az.atual = null; alert("Análises apagadas."); };
+function azAoAbrir(aba) {
+  ({ "az-dashboard": azDashboard, "az-historico": azHistorico, "az-onus": azOnus, "az-riscos": azRiscos, "az-relatorios": azRelatorios, "az-lista": azLista })[aba]?.();
+}
+
+// ---- visualização lado a lado: documento original × texto extraído, com o trecho destacado
+function azVer(pagina = 1, trecho = "") {
+  const a = az.atual; if (!a) return;
+  const total = a.paginas.length; pagina = Math.min(Math.max(pagina, 1), total);
+  const p = a.paginas[pagina - 1];
+  let texto = esc(p.texto);
+  const alvo = (trecho || "").replace(/\s+/g, " ").trim().slice(0, 45);
+  if (alvo) {  // destaca o trecho tolerando quebras de linha e espaços
+    const rx = new RegExp(esc(alvo).split(" ").map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+"), "i");
+    texto = texto.replace(rx, m => `<mark id="az-mark">${m}</mark>`);
+  }
+  document.querySelector(".az-modal")?.remove();
+  document.body.insertAdjacentHTML("beforeend", `<div class="az-modal"><div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><h2 style="margin:0;flex:1">Página ${pagina} de ${total}</h2>
+      <span class="muted">${p.metodo === "ocr" ? `lida por OCR — confiança ${p.confianca ?? "?"}%` : "texto do próprio PDF"}</span>
+      <button class="btn sec" data-ir="${pagina - 1}" ${pagina === 1 ? "disabled" : ""} style="margin:0">‹ Anterior</button>
+      <button class="btn sec" data-ir="${pagina + 1}" ${pagina === total ? "disabled" : ""} style="margin:0">Próxima ›</button>
+      <button class="btn" data-fechar style="margin:0">Fechar</button></div>
+    <div class="az-lado" style="margin-top:14px"><div>${p.imagem ? `<img class="az-pag-img" src="${p.imagem}" alt="Página ${pagina} do documento original">` : `<p class="muted">Imagem da página indisponível.</p>`}</div>
+      <div><div class="az-texto">${texto || `<span class="muted">${AZ_NI}</span>`}</div></div></div></div></div>`);
+  const m = document.querySelector(".az-modal");
+  m.querySelectorAll("[data-ir]").forEach(b => b.onclick = () => azVer(+b.dataset.ir));
+  m.querySelector("[data-fechar]").onclick = () => m.remove();
+  m.onclick = e => { if (e.target === m) m.remove(); };
+  document.getElementById("az-mark")?.scrollIntoView({ block: "center" });
+}
 
 // ---------- REURB
 $("#re-ir").onclick = async () => {
   const body = { baixa_renda_predominante: $("#re-renda").checked, nucleo_consolidado_ate_2016: $("#re-2016").checked, area_publica: $("#re-pub").checked, em_app: $("#re-app").checked, em_area_de_risco: $("#re-risco").checked };
   try {
-    const r = await (await api("/api/reurb/classificar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
+    const r = await (await api("api/reurb/classificar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
     const lista = (t, l) => `<h2>${t}</h2><ul>${l.map(x => `<li>${esc(x)}</li>`).join("")}</ul>`;
     $("#re-res").innerHTML = `<div class="card"><h2 style="font-size:17px">${esc(r.modalidade)}</h2>${alertasHTML(r.alertas)}${lista("Fundamentos", r.fundamentos)}${lista("Instrumentos", r.instrumentos)}${lista("Documentos técnicos", r.documentos)}</div>`;
   } catch (e) { erro("#re-res", e); }
 };
 
-carregarCidades(); montarViabilidade(); montarMasterplan();
+carregarCidades(); montarViabilidade(); montarMasterplan(); carregarCamadasOficiais();
 </script>
 </body>
 </html>

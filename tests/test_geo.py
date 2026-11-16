@@ -62,3 +62,13 @@ def test_kml_valido():
     )
     doc = minidom.parseString(kml.encode())
     assert len(doc.getElementsByTagName("Placemark")) == 5
+
+
+def test_tls_legado_so_para_sicar():
+    from inteligencia_urbana.geo.camadas_oficiais import HOSTS_TLS_LEGADO, contexto_ssl
+
+    assert HOSTS_TLS_LEGADO == {"geoserver.car.gov.br"}
+    rsa = lambda ctx: any(c["name"] == "AES256-GCM-SHA384" for c in ctx.get_ciphers())
+    assert rsa(contexto_ssl("geoserver.car.gov.br"))
+    assert not rsa(contexto_ssl("geoservicos.ibge.gov.br")) and not rsa(contexto_ssl(None))
+    assert contexto_ssl("geoserver.car.gov.br").check_hostname

@@ -10,6 +10,7 @@ from inteligencia_urbana.viabilidade.incorporacao import PremissasIncorporacao, 
 from inteligencia_urbana.viabilidade.loteamento import PremissasLoteamento, estudar_loteamento
 
 RET = [(480000, 7418000), (480400, 7418000), (480400, 7417700), (480000, 7417700)]
+GRADE = {"tracado": "ortogonal", "usar_relevo": False}  # testes da malha reta, sem acesso à internet
 
 
 def test_tir_vpl():
@@ -34,7 +35,7 @@ def test_incorporacao():
 
 
 def test_masterplan_respeita_app_e_areas_publicas():
-    m = gerar_masterplan(ParametrosMasterplan(perimetro_utm=RET, cursos_dagua_utm=[[(479990, 7417700), (480410, 7417700)]]))
+    m = gerar_masterplan(ParametrosMasterplan(perimetro_utm=RET, cursos_dagua_utm=[[(479990, 7417700), (480410, 7417700)]], **GRADE))
     r = m.resumo
     assert r["area_app_m2"] == pytest.approx(400 * 30, rel=1e-3)
     assert r["numero_lotes"] > 100
@@ -61,8 +62,134 @@ def test_api_fluxo_completo():
     assert r["geojson"] is not None
     k = c.post("/api/geo/kml", json={"vertices": r["vertices"], "segmentos": r["segmentos"], "kmz": True})
     assert k.status_code == 200 and k.content[:2] == b"PK"
-    m = c.post("/api/masterplan", json={"perimetro_utm": [[v["e"], v["n"]] for v in r["vertices"]]}).json()
+    m = c.post("/api/masterplan", json={"perimetro_utm": [[v["e"], v["n"]] for v in r["vertices"]], **GRADE}).json()
     assert m["resumo"]["numero_lotes"] > 0
     assert c.post("/api/geo/kml-features", json={"features": m["features"]}).status_code == 200
     assert c.get("/").status_code == 200
     assert c.post("/api/vocacao", json={"cidade": "Cambé", "zona": "ZR3", "area_terreno_m2": 5000}).status_code == 200
+
+
+def _quadrado_lonlat(lon, lat, d):
+    return {"type": "Polygon", "coordinates": [[[lon - d, lat - d], [lon + d, lat - d], [lon + d, lat + d], [lon - d, lat + d], [lon - d, lat - d]]]}
+
+
+def test_cruzar_car_e_drenagem_offline():
+    from inteligencia_urbana.geo import camadas_oficiais as co
+    from inteligencia_urbana.geo.coordenadas import geo_para_utm
+
+    lon, lat = -51.19, -23.33
+    e, n = geo_para_utm(lon, lat)
+    verts = [(e - 100, n - 100), (e + 100, n - 100), (e + 100, n + 100), (e - 100, n + 100)]
+    car = [
+        {"type": "Feature", "geometry": _quadrado_lonlat(lon, lat, 0.002), "properties": {"cod_imovel": "PR-A", "status_imovel": "AT", "area": 18.0}},
+        {"type": "Feature", "geometry": _quadrado_lonlat(lon + 0.01, lat, 0.0005), "properties": {"cod_imovel": "PR-LONGE"}},
+    ]
+    r = co.cruzar_car(verts, 31982, feicoes=car)
+    assert [s["cod_imovel"] for s in r["sobreposicoes"]] == ["PR-A"]
+    assert r["sobreposicoes"][0]["pct_da_matricula"] == pytest.approx(100, abs=0.5)
+
+    rio = {"type": "Feature", "properties": {"nome": "Córrego Teste"},
+           "geometry": {"type": "LineString", "coordinates": [[lon - 0.01, lat], [lon + 0.01, lat]]}}
+    d = co.drenagem_proxima(verts, 31982, 300, feicoes=[rio])
+    assert d["cursos"][0]["corta_o_imovel"] and d["cursos"][0]["extensao_no_imovel_m"] == pytest.approx(200, abs=2)
+    m = gerar_masterplan(ParametrosMasterplan(perimetro_utm=RET, cursos_dagua_utm=[[(480000, 7417850), (480400, 7417850)]], **GRADE))
+    assert m.resumo["area_app_m2"] == pytest.approx(400 * 60, rel=1e-3)
+
+
+def test_subpasta_incorporacao():
+    c = TestClient(app)
+    r = c.get("/incorporacao", follow_redirects=False)
+    assert r.status_code == 308 and r.headers["location"] == "/incorporacao/"
+    assert c.get("/incorporacao/").status_code == 200
+    assert "londrina" in c.get("/incorporacao/api/zoneamento").json()["cidades"]
+    assert c.get("/").status_code == 200
+
+
+def test_api_poligono_desenhado():
+    c = TestClient(app)
+    # quadrado de ~30 m em Londrina, desenhado em lon/lat
+    from inteligencia_urbana.geo.coordenadas import geo_para_utm, utm_para_geo
+    e, n = geo_para_utm(-51.1525, -23.3270)
+    pts = [utm_para_geo(x, y) for x, y in [(e, n), (e + 30, n), (e + 30, n - 30), (e, n - 30)]]
+    r = c.post("/api/geo/poligono", json={"coords_lonlat": pts, "area_referencia_m2": 1000}).json()
+    assert r["area_m2"] == pytest.approx(900, abs=0.5) and r["perimetro_m"] == pytest.approx(120, abs=0.1)
+    assert r["diferenca_pct"] == pytest.approx(-10, abs=0.1)
+    assert [round(s["distancia_m"], 1) for s in r["segmentos"]] == [30.0, 30.0, 30.0, 30.0]
+    cruzado = [pts[0], pts[2], pts[1], pts[3]]
+    assert c.post("/api/geo/poligono", json={"coords_lonlat": cruzado}).status_code == 422
+
+
+def test_masterplan_com_diretrizes():
+    from inteligencia_urbana.masterplan.gerador import ViaPrevista
+
+    # via coletora norte-sul no meio da gleba (traços de 4 m de largura, com falhas) e fundo de vale a leste
+    tracos = [[(480198, y), (480202, y), (480202, y - 10), (480198, y - 10)] for y in range(7418000, 7417700, -14)]
+    fv = [(480350, 7418000), (480400, 7418000), (480400, 7417700), (480350, 7417700)]
+    m = gerar_masterplan(ParametrosMasterplan(
+        perimetro_utm=RET, **GRADE, vias_previstas=[ViaPrevista(largura_m=20, hierarquia="Coletora", partes_utm=tracos)],
+        fundo_vale_utm=[fv]))
+    r = m.resumo
+    assert r["area_vias_diretriz_m2"] == pytest.approx(20 * 300, rel=0.03)  # faixa contínua de 20 m
+    assert r["area_app_m2"] == pytest.approx(50 * 300, rel=0.01)
+    prevista = [f for f in m.features if f["properties"].get("diretriz")]
+    assert prevista and prevista[0]["properties"]["nome"] == "Coletora prevista (20 m)"
+    # nenhum lote sobre a via prevista nem no fundo de vale
+    from shapely.geometry import shape, box
+    from inteligencia_urbana.geo.coordenadas import utm_para_geo
+    lon0, lat0 = utm_para_geo(480190, 7418000); lon1, lat1 = utm_para_geo(480210, 7417700)
+    faixa = box(min(lon0, lon1), min(lat0, lat1), max(lon0, lon1), max(lat0, lat1))
+    lotes = [shape(f["geometry"]) for f in m.features if f["properties"]["tipo"] == "lote"]
+    assert lotes and all(l.intersection(faixa).area < 1e-10 for l in lotes)
+
+
+
+def _sem_sobreposicao(m):
+    from shapely.geometry import shape
+
+    lotes = [shape(f["geometry"]) for f in m.features if f["properties"]["tipo"] == "lote"]
+    vias = [shape(f["geometry"]) for f in m.features if f["properties"]["tipo"] == "via"]
+    for i, a in enumerate(lotes):
+        assert all(a.intersection(v).area < 1e-12 for v in vias)
+        assert all(a.intersection(b).area < 1e-12 for b in lotes[i + 1:])
+    return lotes
+
+
+def test_tracado_organico_sem_relevo_acompanha_o_terreno():
+    gleba = [(480000, 7418000), (480420, 7418060), (480450, 7417690), (480020, 7417650)]
+    m = gerar_masterplan(ParametrosMasterplan(perimetro_utm=gleba, tracado="organico", usar_relevo=False, largura_via_m=15))
+    r = m.resumo
+    assert r["tracado"] == "organico" and r["numero_lotes"] > 150
+    assert any("formato do terreno" in a for a in m.alertas)
+    lotes = _sem_sobreposicao(m)
+    assert all(l.area > 0 for l in lotes)
+    soma = sum(r[k] for k in ("area_lotes_m2", "area_vias_m2", "area_verde_m2", "area_institucional_m2", "area_remanescente_m2", "area_app_m2"))
+    assert soma == pytest.approx(r["area_gleba_m2"], rel=0.01)
+
+
+def test_tracado_organico_com_relevo_sintetico(monkeypatch):
+    """Encosta sintética (sem internet): as ruas principais seguem as curvas de nível."""
+    import numpy as np
+
+    from inteligencia_urbana.geo import relevo
+
+    def mde_falso(bounds, epsg, passo=5.0, margem=60.0):
+        x0, y0, x1, y1 = bounds
+        xs = np.arange(x0 - margem, x1 + margem + passo, passo); ys = np.arange(y0 - margem, y1 + margem + passo, passo)
+        gx, gy = np.meshgrid(xs, ys)
+        z = 500 + 0.08 * (gy - y0) + 15 * np.sin((gx - x0) / 120)  # sobe para o norte, ondulada
+        return relevo.MDE(float(xs[0]), float(ys[0]), passo, z)
+
+    monkeypatch.setattr(relevo, "obter_mde", mde_falso)
+    gleba = [(480000, 7418000), (480420, 7418060), (480450, 7417690), (480020, 7417650)]
+    m = gerar_masterplan(ParametrosMasterplan(perimetro_utm=gleba, tracado="organico", largura_via_m=15))
+    assert any("curvas de nível" in a for a in m.alertas)
+    assert m.resumo["relevo"]["declividade_media_pct"] > 5 and m.curvas_nivel
+    assert m.resumo["numero_lotes"] > 150
+    _sem_sobreposicao(m)
+
+
+def test_logo_e_icones_servidos_inclusive_na_subpasta():
+    c = TestClient(app)
+    for caminho in ("/assets/logo.png", "/assets/logo-quadrado.png", "/assets/favicon.png", "/incorporacao/assets/logo.png"):
+        r = c.get(caminho)
+        assert r.status_code == 200 and r.headers["content-type"] == "image/png"

@@ -3,22 +3,105 @@ uf: PR
 codigo_ibge: 4113700
 orgao_planejamento: IPPUL — Instituto de Pesquisa e Planejamento Urbano de Londrina
 mapa_oficial: SIGLON / Geoportal da Prefeitura de Londrina
-status_dados: >-
-  ILUSTRATIVO. Estrutura pronta para receber os parâmetros oficiais. Os códigos e índices abaixo
-  são exemplos e DEVEM ser substituídos/conferidos com a Lei de Uso e Ocupação do Solo vigente,
-  suas alterações e o mapa oficial de zoneamento.
+status_dados: 'PARCIAL. ZR-3 e ZI-2 conferidas com tabela oficial da Lei 13.905/2024
+  (validado: true); as demais zonas são exemplos e DEVEM ser substituídas pelos parâmetros
+  da lei e do mapa oficial.'
 legislacao:
-  - {tema: Plano Diretor, numero: "a confirmar", validado: false}
-  - {tema: Uso e Ocupação do Solo, numero: "12.236/2015 (confirmar alterações)", validado: false}
-  - {tema: Parcelamento do Solo, numero: "a confirmar", validado: false}
-  - {tema: Sistema Viário, numero: "a confirmar", validado: false}
+- tema: Uso e Ocupação do Solo
+  numero: 13.905/2024
+  validado: true
+- tema: Parcelamento do Solo
+  numero: 13.898/2024
+  validado: true
+- tema: Sistema Viário
+  numero: 13.907/2024
+  validado: true
+- tema: Código Ambiental
+  numero: 11.471/2012
+  validado: true
+- tema: Plano Diretor de Arborização
+  numero: 11.996/2013
+  validado: true
+- tema: Consulta de Parcelamento do Solo (procedimento)
+  numero: Decreto 466/2025
+  validado: true
+- tema: Plano Diretor
+  numero: a confirmar
+  validado: false
 parcelamento:
-  areas_publicas_minimas_pct: {institucional: null, verde: null, sistema_viario: null}
+  areas_publicas_minimas_pct:
+    praca_e_institucional: 12
+    observacao: mínimo de 12% da área computável (art. 19, I, Lei 13.898/2024)
   lote_minimo_m2: null
   testada_minima_m: null
-  comprimento_maximo_quadra_m: null
-  validado: false
+  comprimento_maximo_quadra_m: 250
+  distancia_maxima_entre_coletoras_m: 350
+  faixa_transicao_zona_industrial_m: 100
+  circulo_minimo_area_publica_m: 20
+  fonte: Leis 13.898/2024 e 13.907/2024, citadas na CPS 026/2026
+  validado: true
 zonas:
+  ZR-3:
+    nome: Zona Residencial 3
+    categoria: residencial_media_densidade
+    ca_minimo: 0.15
+    ca_basico: 1.3
+    ca_maximo: null
+    taxa_ocupacao: 0.7
+    taxa_permeabilidade: 0.2
+    gabarito_pavimentos: 0
+    lote_minimo_m2: 250
+    lote_maximo_m2: 62500
+    testada_minima_m: 10
+    unidade_autonoma_minima_m2: 125
+    frente_minima_unidade_m: 5
+    recuo_frontal_m: 5
+    afastamento_lateral_m: 1.5
+    afastamento_fundos_m: 1.5
+    usos_permitidos:
+    - residencial unifamiliar ou bifamiliar (RUB)
+    - multifamiliar em condomínio (RMC-RUB)
+    - multifamiliar vertical (RMV)
+    - misto (M)
+    - comércio e serviços CS-a, CS-b, CS-c
+    variantes:
+      RMV / RCM-RMV e não residencial:
+        ca_basico: 2.0
+        gabarito_pavimentos: 4
+        afastamento_lateral_m: 2.5
+        afastamento_fundos_m: 5
+        observacao: 'acima de 9 m de altura: recuo R = H/10; afastamento lateral AL
+          = H/15 + 1,2 m (mín. 2,5 m); fundos AF = H/15 + 3 m'
+    fonte: Tabela da Lei Municipal nº 13.905/2024 reproduzida na Consulta de Parcelamento
+      do Solo (IPPUL, CPS 026/2026)
+    validado: true
+  ZI-2:
+    nome: Zona Industrial 2
+    categoria: industrial
+    ca_minimo: 0.15
+    ca_basico: 1.2
+    ca_maximo: null
+    taxa_ocupacao: 0.7
+    taxa_permeabilidade: 0.2
+    gabarito_pavimentos: 0
+    lote_minimo_m2: 500
+    lote_maximo_m2: null
+    testada_minima_m: 15
+    unidade_autonoma_minima_m2: 500
+    frente_minima_unidade_m: 15
+    recuo_frontal_m: 5
+    afastamento_lateral_m: 1.5
+    afastamento_fundos_m: 1.5
+    usos_permitidos:
+    - comércio e serviços CS-b a CS-f
+    - indústria Ind-a, Ind-b, Ind-c
+    usos_permissiveis:
+    - Ind-d (condicionado)
+    observacao: lote máximo limitado pelo sistema viário; acima de 9 m de altura,
+      afastamento mínimo e recuo de fundos de 2,5 m
+    fonte: Tabela da Lei Municipal nº 13.905/2024 reproduzida na Consulta de Parcelamento
+      do Solo (IPPUL, CPS 026/2026)
+    validado: true
   ZR1:
     nome: Zona Residencial de baixa densidade (exemplo)
     categoria: residencial_baixa_densidade
@@ -30,20 +113,8 @@ zonas:
     lote_minimo_m2: 360
     testada_minima_m: 12
     recuo_frontal_m: 5
-    usos_permitidos: [residencial unifamiliar]
-    validado: false
-  ZR3:
-    nome: Zona Residencial de média densidade (exemplo)
-    categoria: residencial_media_densidade
-    ca_basico: 1.4
-    ca_maximo: null
-    taxa_ocupacao: 0.6
-    taxa_permeabilidade: 0.2
-    gabarito_pavimentos: 4
-    lote_minimo_m2: 250
-    testada_minima_m: 10
-    recuo_frontal_m: 5
-    usos_permitidos: [residencial unifamiliar, residencial multifamiliar, comércio vicinal]
+    usos_permitidos:
+    - residencial unifamiliar
     validado: false
   ZR5:
     nome: Zona Residencial de alta densidade (exemplo)
@@ -56,7 +127,9 @@ zonas:
     lote_minimo_m2: 450
     testada_minima_m: 15
     recuo_frontal_m: 5
-    usos_permitidos: [residencial multifamiliar, comércio e serviços]
+    usos_permitidos:
+    - residencial multifamiliar
+    - comércio e serviços
     validado: false
   ZC:
     nome: Zona Comercial / Corredor (exemplo)
@@ -69,7 +142,10 @@ zonas:
     lote_minimo_m2: 300
     testada_minima_m: 12
     recuo_frontal_m: 0
-    usos_permitidos: [comércio, serviços, residencial multifamiliar]
+    usos_permitidos:
+    - comércio
+    - serviços
+    - residencial multifamiliar
     validado: false
   ZI:
     nome: Zona Industrial (exemplo)
@@ -82,7 +158,10 @@ zonas:
     lote_minimo_m2: 1000
     testada_minima_m: 20
     recuo_frontal_m: 10
-    usos_permitidos: [indústria, logística, galpões]
+    usos_permitidos:
+    - indústria
+    - logística
+    - galpões
     validado: false
   ZEIS:
     nome: Zona Especial de Interesse Social (exemplo)
@@ -95,5 +174,7 @@ zonas:
     lote_minimo_m2: 125
     testada_minima_m: 5
     recuo_frontal_m: 3
-    usos_permitidos: [habitação de interesse social, comércio vicinal]
+    usos_permitidos:
+    - habitação de interesse social
+    - comércio vicinal
     validado: false
