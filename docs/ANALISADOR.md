@@ -52,3 +52,11 @@ Regras de confiabilidade (valem para todas as fases):
 - **IA:** chave da API do modelo de linguagem configurada apenas no servidor (variável de ambiente na Vercel).
 - **Repositório público:** para tratar documentos de clientes, tornar o repositório privado. Nenhum documento real
   é versionado; os testes usam matrículas fictícias.
+
+## Identidade visual
+
+Paleta oficial: primária `#142D3A` (menu lateral), secundária `#315568`, fundo `#F4F5F2`, superfície `#FFFFFF`,
+destaque `#C6A66B` (uso pontual: item ativo, marca, realce de trecho), sucesso `#27866A`, alerta `#D49A3A`,
+perigo `#C65353`. Tipografia Inter, ícones Lucide (versão fixada), cantos de 8–12 px, sombras suaves e tabelas com
+cabeçalho discreto e linhas espaçadas. Cores cartográficas (vias do IPPUL, hidrografia, masterplan) seguem as
+convenções de mapa e não a paleta da interface.
