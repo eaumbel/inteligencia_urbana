@@ -688,7 +688,29 @@ async function workerOCR(aviso) {
   return tessPromessa;
 }
 // linhas do carimbo de autenticidade das certidões digitais não contam como conteúdo
-const CARIMBO = /assinado\s+digitalmente|verificar\s+a\s+autenticidade|registradores\.onr|digite\s+o\s+hash|^\s*certid[ãa]o\s+n[º°o.]*\s*[\d.]+\s*\|?\s*$|consultar\s+a\s+autenticidade|aripar\.org|e-validador|c[óo]digo\s+de\s+verifica|consulta\s+dispon[íi]vel|^\s*p[áa]gina|valide\s+aqui|^\s*este\s+documento\s*$|sptth|rb\.gro/i;
+const CARIMBO = /assinado\s+digitalmente|documento\s+assinado|CPF:?\s*[\d.\-]{11,14}\s+em\s+\d|^\s*[A-Z0-9]{18,}\s*$|verificar\s+a\s+autenticidade|registradores\.onr|digite\s+o\s+hash|^\s*certid[ãa]o\s+n[º°o.]*\s*[\d.]+\s*\|?\s*$|consultar\s+a\s+autenticidade|aripar\.org|e-validador|c[óo]digo\s+de\s+verifica|consulta\s+dispon[íi]vel|^\s*p[áa]gina|valide\s+aqui|^\s*este\s+documento\s*$|sptth|rb\.gro/i;
+// página escaneada com carimbo digital por cima: uma imagem cobre boa parte da página e o texto é só o carimbo
+async function imagemCobrePagina(pg) {
+  try {
+    const lib = await carregarPdfJs(), OPS = lib.OPS, ops = await pg.getOperatorList();
+    const [x0, y0, x1, y1] = pg.view, area = Math.abs((x1 - x0) * (y1 - y0));
+    const mul = (a, b) => [a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1], a[0] * b[2] + a[2] * b[3], a[1] * b[2] + a[3] * b[3],
+      a[0] * b[4] + a[2] * b[5] + a[4], a[1] * b[4] + a[3] * b[5] + a[5]];
+    let m = [1, 0, 0, 1, 0, 0]; const pilha = [];
+    const imagens = [OPS.paintImageXObject, OPS.paintInlineImageXObject, OPS.paintImageMaskXObject, OPS.paintJpegXObject].filter(x => x != null);
+    for (let k = 0; k < ops.fnArray.length; k++) {
+      const f = ops.fnArray[k], a = ops.argsArray[k];
+      if (f === OPS.save) pilha.push(m);
+      else if (f === OPS.restore) m = pilha.pop() || m;
+      else if (f === OPS.transform) m = mul(m, a);
+      else if (f === OPS.paintFormXObjectBegin) { pilha.push(m); if (Array.isArray(a?.[0]) && a[0].length === 6) m = mul(m, a[0]); }
+      else if (f === OPS.paintFormXObjectEnd) m = pilha.pop() || m;
+      else if (imagens.includes(f) && Math.hypot(m[0], m[1]) * Math.hypot(m[2], m[3]) > area * 0.4) return true;
+    }
+  } catch (e) { console.warn("imagemCobrePagina", e); }
+  return false;
+}
+const precisaOCR = async (pg, texto, minimo) => conteudoUtil(texto) < minimo || (conteudoUtil(texto) < 800 && await imagemCobrePagina(pg));
 const conteudoUtil = t => t.split("\n").filter(l => l.trim().length > 10 && !CARIMBO.test(l)).join("").replace(/\s/g, "").length;
 
 async function textoDoArquivo(arq, aviso) {
@@ -701,7 +723,7 @@ async function textoDoArquivo(arq, aviso) {
     const pagina = await pdf.getPage(i);
     const c = await pagina.getTextContent();
     let texto = c.items.map(it => it.str + (it.hasEOL ? "\n" : " ")).join("");
-    if (conteudoUtil(texto) < 200) {  // página escaneada: renderiza em ~300 dpi e faz OCR
+    if (await precisaOCR(pagina, texto, 200)) {  // página escaneada: renderiza em ~300 dpi e faz OCR
       const w = await workerOCR(aviso);
       workerOCR.pagina = `${i} de ${pdf.numPages}`;
       aviso(`Reconhecendo texto (OCR) — página ${workerOCR.pagina}…`);
@@ -1774,7 +1796,7 @@ async function azLerPaginas(arquivos, aviso) {
         const vp = pg.getViewport({ scale: 3 }), canvas = document.createElement("canvas");
         canvas.width = vp.width; canvas.height = vp.height;
         await pg.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
-        if (conteudoUtil(texto) < 50) {  // página escaneada (ou só com carimbo digital): OCR
+        if (await precisaOCR(pg, texto, 50)) {  // página escaneada (ou só com carimbo digital): OCR
           const r = await azOCR(canvas, `${n}`, aviso);
           texto = r.texto; confianca = r.confianca; metodo = "ocr";
         }

@@ -235,3 +235,28 @@ registrada sob nº 3 desta matrícula.""")])
     assert an.cotitularidade and an.proprietarios_atuais == []  # partes ideais: lista de donos não é deduzida
     o = an.onus[0]
     assert (o.ato, o.situacao, o.ato_baixa) == ("R-3", "PARCIALMENTE CANCELADA", "AV-4")
+
+
+def test_averbacao_numero_matricula_e_subletra():
+    """2º RI de Londrina: "Averbação nº 1/66.627", "Averbação nº 1/66.627/A" e ônus anterior marcado como LIQUIDADO."""
+    e = extrair([Pagina(1, """2º OFÍCIO DE REGISTRO DE IMÓVEIS DE LONDRINA - PARANÁ
+Matrícula nº 80.002
+IMÓVEL:- Data de terras nº 5, da quadra 9, com a área de 500,00 m².
+PROPRIETÁRIA:- EMPRESA FICTÍCIA DE TERRAS S.A.
+Averbação nº 1/80.002
+(Ônus Anterior) LIQUIDADO
+DATA.:- 4 de Maio de 2005.- fica averbada a existência do ônus anterior: COMPROMISSO DE COMPRA E VENDA,
+sendo compromissário comprador, JOÃO EXEMPLO.
+Averbação nº 1/80.002/A
+(Formal de Partilha de Direitos)
+DATA:- 4 de Maio de 2005.- Transmitente: JOÃO EXEMPLO, falecido. Herdeiros: ANA EXEMPLO, brasileira.
+R.2/80.002 de 01 de dezembro de 2011. Compra e venda. TRANSMITENTE: EMPRESA FICTÍCIA DE TERRAS S.A., com sede
+nesta cidade. ADQUIRENTE: ANA EXEMPLO, brasileira. VALOR: R$ 10.000,00.""")])
+    assert [a.id for a in e.atos] == ["AV-1", "AV-1/A", "R-2"] and e.sequencia["faltantes"] == []
+    assert e.identificacao["uf"].valor == "PR"
+    an = analisar(e)
+    nat = {a.id: a.natureza for a in an.atos}
+    assert nat["AV-1/A"] == "transmissão de direitos"  # direitos de compromissário não são propriedade
+    assert an.proprietarios_atuais == ["ANA EXEMPLO"] and not an.alertas_cadeia
+    o = an.onus[0]
+    assert o.situacao == "PENDENTE DE CONFIRMAÇÃO" and "liquidado" in o.observacao

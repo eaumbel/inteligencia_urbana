@@ -21,6 +21,7 @@ from ..documentos.matricula import (
 NAO_IDENTIFICADO = "Não identificado no documento analisado."
 CONFIANCA_BAIXA = 70.0  # % (OCR)
 # linhas de cabeçalho/rodapé repetidas em cada folha (não contam como conteúdo do ato)
+AV_NUM_RE = re.compile(r"(?i:averba[çc][ãa]o)\s+(?i:n)\.?\s*[º°o]?\.?\s*(\d{1,3})\s*/\s*(\d[\d.,]*\d)(?:\s*/\s*([A-Z])\b)?")
 AV_LETRA_RE = re.compile(r"(?i:averba[çc][ãa]o)\s+(?i:n)\.?\s*[º°o]?\.?\s*(\d[\d.,]*\d)\s*/\s*([A-Z])\b")
 CABECALHO_RE = re.compile(r"REP[ÚU]BLICA\s+FEDERATIVA|SERVI[ÇC]O\s+DE\s+REGISTRO|REGISTRO\s+(?:GERAL|DE\s+IM[ÓO]VEIS)|OFICIAL|TITULAR|"
                           r"Rua\s|Fone|Sala\s+\d|Andar|FOLHA|FICHA|MATR[ÍI]CULA\s*(?:N|:)|CONTINUA|CNM\s|Valide|documento|"
@@ -191,6 +192,9 @@ def _identificacao(doc: _Documento, base) -> dict[str, Campo]:
     if not uf:
         e = re.search(r"ESTADO\s+D[OE]\s+([A-ZÀ-Ú ]{4,25})", t)
         uf = UF_POR_ESTADO.get(e.group(1).strip()) if e else None
+    if not uf:  # "2º OFÍCIO DE REGISTRO DE IMÓVEIS DE LONDRINA - PARANÁ"
+        e = re.search(r"im[óo]veis[^\n]{0,60}?[-–/]\s*(" + "|".join(UF_POR_ESTADO) + r")\b", t, re.I)
+        uf = UF_POR_ESTADO.get(e.group(1).upper()) if e else None
     municipio = municipio or (base.comarca.title() if base.comarca else None)
     ident["municipio"] = doc.campo(municipio, re.escape(municipio) if municipio else None)
     ident["uf"] = Campo(uf, ident["municipio"].fonte if uf and m else None)
@@ -248,6 +252,14 @@ def _atos(doc: _Documento, numero: str | None) -> list[Ato]:
             tipo = "AV" if re.search(r"[AV]", m.group(1).upper()) and "R" not in m.group(1).upper() else "R"
             marcas.append((m.start(2) - len(m.group(1)), tipo, n, ""))
             conhecidos.add(n)
+    # "Averbação nº 1/66.627" (2º RI de Londrina) e sub-averbação "Averbação nº 1/66.627/A"
+    for m in AV_NUM_RE.finditer(t):
+        if REFERENCIA_RE.search(t[max(0, m.start() - 40):m.start()]) or (alvo and _digitos(m.group(2)) != alvo):
+            continue
+        n, letra = int(m.group(1)), (m.group(3) or "").upper()
+        if not letra and any(abs(p - m.start()) < 30 for p, *_ in marcas):
+            continue
+        marcas.append((m.start(), "AV", n, letra))
     # fichas antigas: averbações identificadas por letra ("Averbação nº 58.028/A"), antes da numeração dos atos
     for m in AV_LETRA_RE.finditer(t):
         if REFERENCIA_RE.search(t[max(0, m.start() - 40):m.start()]) or (alvo and _digitos(m.group(1)) != alvo):
@@ -285,7 +297,7 @@ def _atos(doc: _Documento, numero: str | None) -> list[Ato]:
         confs = [p.confianca for p in doc.paginas if p.numero in paginas and p.confianca is not None]
         metodo = "ocr" if any(p.metodo == "ocr" for p in doc.paginas if p.numero in paginas) or doc.ocr else "texto"
         atos.append(Ato(
-            id=f"{tipo}-{letra or num}", tipo=tipo, numero=num, data=data, data_texto=data_txt, data_origem=origem,
+            id=f"{tipo}-{num}/{letra}" if num and letra else f"{tipo}-{letra or num}", tipo=tipo, numero=num, data=data, data_texto=data_txt, data_origem=origem,
             paginas=paginas, categorias=cats, texto_original=corpo[:4000], metodo=metodo,
             confianca=min(confs) if confs else None, fonte=doc.fonte(ini0, corpo[:300]),
         ))
@@ -295,7 +307,7 @@ def _atos(doc: _Documento, numero: str | None) -> list[Ato]:
 
 
 def _sequencia(atos: list[Ato], ultimo_certificado: int | None) -> dict:
-    nums = [a.numero for a in atos if a.numero]  # averbações com letra ficam fora da numeração
+    nums = [a.numero for a in atos if a.numero and "/" not in a.id]  # averbações com letra ficam fora da numeração
     numeracao_unica = len(nums) == len(set(nums))  # registro contínuo: R-1, AV-2, R-3...
     faltantes = []
     if atos and numeracao_unica:

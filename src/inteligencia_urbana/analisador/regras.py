@@ -170,6 +170,9 @@ def _primeira_natureza(trecho: str) -> str | None:
 def natureza(ato: Ato) -> str:
     """Título do ato (início do texto); se não houver, o campo "TÍTULO"/"FORMA DO TÍTULO" (ex.: Formal de Partilha)."""
     texto = _plano(ato.texto_original)
+    # partilha/cessão de DIREITOS (ex.: direitos de compromissário comprador) não transmite a propriedade
+    if re.search(r"(?:partilha|cess[ãa]o|transmiss[ãa]o)\s+(?:de\s+|dos\s+)direitos", texto[:200], re.I):
+        return "transmissão de direitos"
     nat = _primeira_natureza(texto[:320])
     if nat:
         return nat
@@ -305,6 +308,7 @@ def explicar(a: Ato, nat: str, de: list[str], para: list[str], valor: str | None
         "compra e venda": f"{quando}, {_lista(de) if de else 'o dono anterior'} {_v(de, 'vendeu', 'venderam')} o imóvel para {_lista(para)}.{v} A partir daí, quem comprou passou a ser dono.",
         "doação": f"{quando}, {_lista(de) if de else 'o dono anterior'} {_v(de, 'deu', 'deram')} o imóvel de presente (doação) para {_lista(para)}. Doar é passar o imóvel para outra pessoa sem ela pagar por ele.",
         "transmissão": f"{quando}, o imóvel passou de {_lista(de) if de else 'o dono anterior'} para {_lista(para)}. O tipo de negócio não ficou claro no texto lido.",
+        "transmissão de direitos": f"{quando}, os direitos sobre o imóvel (por exemplo, o direito de comprá-lo) passaram de {_lista(de) if de else 'quem os tinha'} para {_lista(para)}. Isso não muda, sozinho, quem é o dono registrado.",
         "partilha/inventário": f"{quando}, depois do falecimento ou da separação de quem era dono, o imóvel passou para {_lista(para)}. Isso se chama partilha.",
         "permuta": f"{quando}, o imóvel foi trocado (permuta). Quem recebeu o imóvel foi {_lista(para)}.",
         "arrematação": f"{quando}, o imóvel foi vendido em leilão da Justiça e quem arrematou foi {_lista(para)}.",
@@ -393,6 +397,13 @@ def analisar(ext: Extracao, hoje: date | None = None) -> Analise:
                 o.situacao = "PENDENTE DE CONFIRMAÇÃO"
                 o.ato_baixa, o.data_baixa = c.id, c.data
                 o.observacao = f"O ato {c.id} cancela um(a) {o.tipo}, mas não cita o número do ato; o vínculo com {o.ato} foi deduzido pelo tipo e precisa ser confirmado."
+    titulos = {a.id: _plano(a.texto_original)[:160] for a in ext.atos}
+    for o in onus:
+        if o.situacao == "ATIVA" and re.search(r"\bliquidad[oa]|\bquitad[oa]|\bextint[oa]", titulos.get(o.ato, ""), re.I):
+            o.situacao = "PENDENTE DE CONFIRMAÇÃO"
+            o.observacao = ("O próprio ato traz a anotação de que foi liquidado/quitado, mas não encontramos um ato de cancelamento. "
+                            "Confirme no Registro de Imóveis se ele ainda produz efeitos.")
+            o.explicacao += " No próprio ato aparece a palavra 'liquidado' (ou 'quitado'), mas não há ato cancelando."
     for o in onus:
         if o.situacao == "ATIVA":
             o.observacao = "Não foi encontrado ato de cancelamento na matrícula analisada."
@@ -478,9 +489,13 @@ def analisar(ext: Extracao, hoje: date | None = None) -> Analise:
          "Não foi possível identificar com segurança quem é o dono atual."),
         f"Encontramos {len(ext.atos)} atos na matrícula: {ext.estatisticas['registros']} registros e {ext.estatisticas['averbacoes']} averbações.",
         (f"Há {len(ativos)} ônus sem cancelamento na matrícula: " + ", ".join(f"{o.tipo} ({o.ato})" for o in ativos) + "." if ativos
-         else "Não encontramos ônus ativos na matrícula analisada." if onus else "Não encontramos ônus (dívidas ou impedimentos) registrados no texto lido."),
+         else "Não encontramos ônus que ainda valham sem nenhum sinal de cancelamento." if onus else "Não encontramos ônus (dívidas ou impedimentos) registrados no texto lido."),
         f"Situação geral: {sit[0].lower()}.",
     ]
+    conferir = [o for o in onus if o.situacao.startswith(("PENDENTE", "PARCIAL"))]
+    if conferir:
+        resumo.insert(4, f"Há {len(conferir)} ônus que precisa(m) ser conferido(s), porque o cancelamento não ficou claro: "
+                         + ", ".join(f"{o.tipo} ({o.ato})" for o in conferir) + ".")
     if emi:
         resumo.append(f"A certidão foi emitida em {dbr(emi)}" + (f", há {dias} dias." if dias is not None else "."))
 
@@ -521,7 +536,7 @@ def _riscos(ext: Extracao, onus: list[Onus], transm: list[Transmissao], alertas_
             rs.append(Risco("ALTO" if o.tipo in {"usufruto", "cláusulas restritivas"} else "MODERADO", f"{o.tipo.capitalize()} sem cancelamento", onde,
                             "Limita o uso ou a venda do imóvel.", "Documento que extinga ou cancele o direito, averbado na matrícula.", "Se o direito ainda existe."))
         elif o.situacao.startswith(("PENDENTE", "PARCIAL")):
-            rs.append(Risco("ALTO", f"{o.tipo.capitalize()}: baixa não confirmada", onde, o.observacao or "Cancelamento parcial ou sem vínculo claro.",
+            rs.append(Risco("MODERADO" if "liquidado" in o.observacao else "ALTO", f"{o.tipo.capitalize()}: baixa não confirmada", onde, o.observacao or "Cancelamento parcial ou sem vínculo claro.",
                             "Certidão do ato de cancelamento e esclarecimento do Registro de Imóveis.", "Se o cancelamento atinge todo o ônus."))
         if o.quitacao_mencionada and o.situacao == "ATIVA":
             rs.append(Risco("MODERADO", "Quitação mencionada sem cancelamento", onde, "Pagar a dívida não apaga o registro sozinho.",

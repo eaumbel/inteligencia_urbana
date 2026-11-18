@@ -398,6 +398,7 @@ def _medidas_lineares(texto: str) -> list[MedidaLinear]:
 CARIMBO_RE = re.compile(
     r"consultar\s+a\s+autenticidade|aripar\.org|e-validador|c[óo]digo\s+de\s+verifica|consulta\s+dispon[íi]vel|"
     r"^\s*p[áa]gina\s*:?\s*\d*\s*/?\s*\d*\s*$|valide\s+aqui|assinado\s+digitalmente|verificar\s+a\s+autenticidade|"
+    r"documento\s+assinado|CPF:?\s*[\d.\-]{11,14}\s+em\s+\d|^\s*[A-Z0-9]{18,}\s*$|"
     r"registradores\.onr|digite\s+o\s+hash|^\s*este\s+documento\s*$|sptth|rb\.gro|^\s*\S{1,10}\s*$",
     re.I,
 )
