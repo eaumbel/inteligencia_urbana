@@ -192,9 +192,6 @@ body.sem-mapa .col-mapa{display:none}
 .az-passos li.feito{color:var(--ink)}
 .az-passos li.feito::before{border-color:var(--ok);background:var(--ok)}
 .az-passos li small{margin-left:auto;color:var(--muted);font-weight:500}
-.az-filtro{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;align-items:end}
-.az-filtro label{display:block;font-size:12.5px;font-weight:500;color:var(--muted);margin-bottom:5px}
-.az-filtro-acoes .btn{margin:0;width:100%}
 .az-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
 .az-ind{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
 .az-ind small{display:block;font-size:12px;color:var(--muted);font-weight:500}
@@ -1860,8 +1857,8 @@ function azAtoLinha(a) {
 }
 
 // ---- relatório em PDF (linguagem simples)
-async function azBaixarPDF(botao, a = az.atual) {
-  if (!a) return;
+async function azBaixarPDF(botao) {
+  const a = az.atual; if (!a) return;
   const txt = botao?.innerHTML; if (botao) { botao.disabled = true; botao.textContent = "Gerando relatório…"; }
   try {
     const r = await api("api/analisador/relatorio", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -1964,55 +1961,17 @@ function azRiscos() {
       : "<p>Nenhum ponto de atenção encontrado pelas regras do sistema. Isso não substitui uma certidão atualizada nem a análise de um profissional.</p>"}</div>
     <div class="card"><h2>O que pedir antes de fechar negócio</h2><ul style="margin:0;padding-left:18px;line-height:1.7">${a.extracao.analise.documentos_recomendados.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>`;
 }
-// ---- relatórios: análises salvas, filtradas por período (data da análise) e nº da matrícula
-const azDiaLocal = iso => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
-az.filtroRel = az.filtroRel || { ini: "", fim: "", mat: "" };
-async function azRelatorios() {
-  const a = az.atual, f = az.filtroRel;
-  $("#az-rel").innerHTML = `${a ? `<div class="card"><h2>Relatório da matrícula aberta${a.extracao.identificacao.numero_matricula.valor ? " — nº " + esc(a.extracao.identificacao.numero_matricula.valor) : ""}</h2>
+function azRelatorios() {
+  const a = az.atual; if (!a) return azSemAnalise("#az-rel");
+  $("#az-rel").innerHTML = `<div class="card"><h2>Relatório da matrícula (PDF)</h2>
     <p>Um documento em linguagem simples, que qualquer pessoa entende: situação geral, quem é o dono, dívidas e se foram canceladas,
     pontos de atenção, o que pedir antes de fechar negócio e cada ato explicado ao lado do texto original, sempre com a página.</p>
-    ${azBotaoPDF}<button class="btn sec" id="az-json">Baixar dados técnicos (JSON)</button></div>` : ""}
-    <div class="card"><h2>Relatórios por período</h2>
-      <div class="az-filtro">
-        <div><label for="az-f-ini">Data inicial</label><input type="date" id="az-f-ini" value="${f.ini}"></div>
-        <div><label for="az-f-fim">Data final</label><input type="date" id="az-f-fim" value="${f.fim}"></div>
-        <div><label for="az-f-mat">Nº da matrícula</label><input type="text" id="az-f-mat" inputmode="numeric" placeholder="Todas" value="${esc(f.mat)}"></div>
-        <div class="az-filtro-acoes"><button class="btn sec" id="az-f-limpar">Limpar filtros</button></div>
-      </div>
-      <div id="az-f-res"></div></div>`;
-  if (a) {
-    azLigarPDF($("#az-rel"));
-    $("#az-json").onclick = () => { const { paginas, ...resto } = a;
-      baixar(new Blob([JSON.stringify({ ...resto, paginas: paginas.map(({ imagem, ...p }) => p) }, null, 2)], { type: "application/json" }), `matricula_${a.extracao.identificacao.numero_matricula.valor || a.id}.json`); };
-  }
-  const itens = (await azListar()).sort((x, y) => y.id - x.id);
-  const aplicar = () => {
-    f.ini = $("#az-f-ini").value; f.fim = $("#az-f-fim").value; f.mat = $("#az-f-mat").value.trim();
-    $("#az-f-fim").min = f.ini || ""; $("#az-f-ini").max = f.fim || "";
-    if (f.ini && f.fim && f.ini > f.fim) {
-      $("#az-f-res").innerHTML = `<div class="alerta">A data inicial é depois da data final. Corrija o período.</div>`; return;
-    }
-    const alvo = f.mat.replace(/\D/g, "");
-    const lista = itens.filter(x => { const dia = azDiaLocal(x.criado_em);
-      return (!f.ini || dia >= f.ini) && (!f.fim || dia <= f.fim) &&
-        (!alvo || (x.extracao.identificacao.numero_matricula.valor || "").replace(/\D/g, "").includes(alvo)); });
-    const periodo = f.ini || f.fim ? ` de ${f.ini ? dataBR(f.ini) : "início"} a ${f.fim ? dataBR(f.fim) : "hoje"}` : "";
-    $("#az-f-res").innerHTML = `<p class="muted" style="margin:12px 0 8px">${lista.length} de ${itens.length} análise(s)${periodo}.</p>` + (lista.length
-      ? `<table><tr><th>Matrícula</th><th>Analisada em</th><th>Situação</th><th></th></tr>${lista.map(x => { const sit = x.extracao.analise?.situacao?.classe;
-          return `<tr><td><b>${esc(x.extracao.identificacao.numero_matricula.valor || "—")}</b><div class="muted">${[x.extracao.identificacao.cartorio.valor, x.arquivo].filter(Boolean).map(esc).join(" · ")}</div></td>
-          <td style="white-space:nowrap">${new Date(x.criado_em).toLocaleString("pt-BR")}</td>
-          <td>${sit ? `<span style="color:${AZ_SIT_COR[sit]};font-weight:600">${esc(sit)}</span>` : `<span class="muted">reprocessar ao abrir</span>`}</td>
-          <td style="white-space:nowrap"><button class="btn" data-pdf-id="${x.id}" style="margin:0 4px 0 0"><i data-lucide="file-down"></i> PDF</button><button class="btn sec" data-abrir-rel="${x.id}" style="margin:0">Abrir</button></td></tr>`; }).join("")}</table>`
-      : `<p>Nenhuma análise encontrada${periodo || " com esses filtros"}.</p>`);
-    window.lucide?.createIcons();
-    $("#az-f-res").querySelectorAll("[data-pdf-id]").forEach(b => b.onclick = () => azBaixarPDF(b, itens.find(x => x.id === +b.dataset.pdfId)));
-    $("#az-f-res").querySelectorAll("[data-abrir-rel]").forEach(b => b.onclick = () => { az.atual = itens.find(x => x.id === +b.dataset.abrirRel); document.querySelector('[data-aba="az-dashboard"]').click(); });
-  };
-  ["#az-f-ini", "#az-f-fim"].forEach(id => $(id).onchange = aplicar);
-  $("#az-f-mat").oninput = aplicar;
-  $("#az-f-limpar").onclick = () => { $("#az-f-ini").value = $("#az-f-fim").value = $("#az-f-mat").value = ""; aplicar(); };
-  aplicar();
+    ${azBotaoPDF}</div>
+    <div class="card"><h2>Dados técnicos</h2><p class="muted">Para integração com outros sistemas: todos os dados extraídos, com página, ato e trecho original.</p>
+    <button class="btn sec" id="az-json">Baixar dados técnicos (JSON)</button></div>`;
+  azLigarPDF($("#az-rel"));
+  $("#az-json").onclick = () => { const { paginas, ...resto } = a;
+    baixar(new Blob([JSON.stringify({ ...resto, paginas: paginas.map(({ imagem, ...p }) => p) }, null, 2)], { type: "application/json" }), `matricula_${a.extracao.identificacao.numero_matricula.valor || a.id}.json`); };
 }
 async function azLista() {
   const itens = (await azListar()).sort((x, y) => y.id - x.id);
