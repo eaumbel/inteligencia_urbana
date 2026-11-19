@@ -157,3 +157,36 @@ def test_croqui_vetorial_escala_pela_area():
     assert ("via_coletora", [[-100, -40], [100, -40]]) in tipos
     assert ("hidrografia", [[0, 120], [0, -180]]) in tipos
     assert len(c["feicoes"]) == 2
+
+
+def test_memorial_rumos_por_direcao_com_curva():
+    """Rumos só por direção ("S - N", "W - E", "rumo E - W") e trecho em curva sem raio (texto fictício)."""
+    from inteligencia_urbana.documentos.matricula import analisar_matricula
+
+    texto = """MATRÍCULA N.º 99.001
+Lote de terras sob o n.º 1-B, com a área de 4,8400 hectares, ou 48.400,00 metros quadrados, situado na Gleba Fictícia,
+dentro das seguintes divisas e confrontações:- "Inicia-se em um ponto de divisa dos lotes 2 e 1-A, segue confrontando
+com o lote 1-A nos seguintes rumos e distâncias: S - N - 100,00 Es
+Í = metros, W - E - 484,90 metros, atingindo a faixa de domínio da Rodovia; segue pela faixa de domínio em
+desenvolvimento de curva de 100,26 metros, atingindo novamente a divisa com o lote 2; segue confrontando com o
+referido lote no rumo E - W, distância de 486,86 metros, chegando assim ao ponto de partida".
+PROPRIETÁRIOS:- JOSÉ FICTÍCIO."""
+    r = analisar_matricula(texto)
+    f = r.forma
+    assert f["fonte"].startswith("rumos e distâncias") and f["orientacao"] == "fixa"
+    assert abs(r.area_calculada_m2 - 48387.4) < 1 and r.perimetro_m == 1172.02  # não mais o quadrado de 220 m
+    assert f["curva"]["lado"] == "para dentro" and abs(f["curva"]["raio_m"] - 417.5) < 0.5
+    xs = [p[0] for p in f["pontos_m"]]; ys = [p[1] for p in f["pontos_m"]]
+    assert max(xs) - min(xs) > 480 and max(ys) - min(ys) == 100  # faixa de ~485 m x 100 m
+
+
+def test_curva_sem_area_vira_reta_e_rumos_retos_viram_poligonal():
+    from inteligencia_urbana.geo.forma import forma_por_rumos_com_curva
+    from inteligencia_urbana.documentos.matricula import analisar_matricula
+
+    f = forma_por_rumos_com_curva([{"tipo": "reta", "az": 0.0, "d": 10}, {"tipo": "reta", "az": 90.0, "d": 20},
+                                   {"tipo": "curva", "s": 10.5, "raio": None}, {"tipo": "reta", "az": 270.0, "d": 20}])
+    assert f["area_m2"] == 200 and any("como reta" in a for a in f["avisos"])
+    r = analisar_matricula("MATRÍCULA Nº 1\nIMÓVEL: área de 200,00 m². Rumos: S - N - 10,00 metros, W - E - 20,00 metros, "
+                           "N - S - 10,00 metros, E - W - 20,00 metros, fechando o perímetro.")
+    assert r.area_calculada_m2 == 200 and r.perimetro_m == 60

@@ -373,6 +373,51 @@ def _lances(texto: str) -> list[tuple[float, float, str | None, int]]:
     return out
 
 
+# rumo só por direção: "S - N - 100,00 metros", "rumo E - W, distância de 486,86 metros", "NE-SW 30,00 m"
+_PONTO = r"(?:NE|NW|NO|SE|SW|SO|N|S|E|W|L|O)"
+RUMO_CARDEAL_RE = re.compile(
+    rf"(?<![\w/])(?P<de>{_PONTO})\s*[-–]\s*(?P<para>{_PONTO})(?![\w/])\s*[-–,:]?\s*(?:(?:na\s+)?dist[âa]ncia\s+de\s+|com\s+|medindo\s+)?"
+    # tolera ruído de OCR da margem entre o número e "metros": "100,00 o metros", "100,00 Es\nÍ = metros"
+    rf"(?P<d>{NUM})(?:\s+[^\d\s,;]{{1,3}}){{0,3}}\s*(?:m\b|mts?\.?|metros)")
+CURVA_RE = re.compile(
+    rf"(?:desenvolvimento\s+de\s+curva|curva|arco)\s+(?:de|com|medindo)\s+(?:desenvolvimento\s+de\s+)?(?P<s>{NUM})\s*(?:m\b|mts?\.?|metros)"
+    rf"(?:[^;.]{{0,60}}?raio\s+(?:de\s+)?(?P<r>{NUM})\s*(?:m\b|metros))?", re.I)
+_AZ_PONTO = {"N": 0, "NE": 45, "E": 90, "L": 90, "SE": 135, "S": 180, "SW": 225, "SO": 225, "W": 270, "O": 270, "NW": 315, "NO": 315}
+
+
+def _lances_cardeais(texto: str) -> list[dict]:
+    """Trechos do memorial com rumo só por direção ("S - N" = rumo Norte) e trechos em curva, na ordem do texto."""
+    t = re.sub(r"\s+", " ", texto)
+    itens = []
+    for m in RUMO_CARDEAL_RE.finditer(t):
+        de, para = m["de"].upper(), m["para"].upper()
+        if de == para or len(de) != len(para):
+            continue
+        a, b = _AZ_PONTO[de], _AZ_PONTO[para]
+        if (a - b) % 360 != 180:  # "S - N", "W - E", "NE - SW": pontos opostos
+            continue
+        try:
+            itens.append({"tipo": "reta", "az": float(b), "d": parse_numero_br(m["d"]), "pos": m.start()})
+        except ValueError:
+            continue
+    if len(itens) < 2:
+        return []
+    for m in CURVA_RE.finditer(t):
+        try:
+            itens.append({"tipo": "curva", "s": parse_numero_br(m["s"]), "raio": parse_numero_br(m["r"]) if m["r"] else None, "pos": m.start()})
+        except ValueError:
+            continue
+    itens.sort(key=lambda x: x["pos"])
+    # um memorial = trechos próximos entre si; certidões com a ficha repetida trazem a descrição duas vezes
+    grupos, atual = [], []
+    for it in itens:
+        if atual and it["pos"] - atual[-1]["pos"] > 400:
+            grupos.append(atual); atual = []
+        atual.append(it)
+    grupos.append(atual)
+    return next((g for g in grupos if len(g) >= 3), [])
+
+
 def _medidas_lineares(texto: str) -> list[MedidaLinear]:
     padrao = re.compile(
         rf"(?P<m>{NUM})\s*(?:m\b|mts?\.?|metros(?:\s+lineares)?)\s*,?\s+(?:de\s+|d[oa]s?\s+|na\s+|nos?\s+|pela\s+|pelos?\s+|para\s+a\s+|em\s+)?"
@@ -523,6 +568,11 @@ def analisar_matricula(texto: str, epsg: int | None = None) -> ResultadoMatricul
     r.transmissoes = _transmissoes(r.atos)
     r.vertices = _vertices(texto, r.epsg)
     lances = _lances(texto)
+    # memorial fica antes do primeiro ato (a "identificação" pode começar depois dele em certidões com páginas fora de ordem)
+    cardeais = _lances_cardeais(texto[:pos_primeiro_ato] if pos_primeiro_ato else texto) if len(lances) < 3 else []
+    if len(cardeais) >= 3 and all(c["tipo"] == "reta" for c in cardeais):
+        lances = [(c["az"], c["d"], None, c["pos"]) for c in cardeais]  # poligonal comum
+        cardeais = []
     r.medidas = _medidas_lineares(identificacao) + _confrontacoes_cardeais(identificacao)
 
     if len(r.vertices) >= 3:
@@ -562,7 +612,19 @@ def analisar_matricula(texto: str, epsg: int | None = None) -> ResultadoMatricul
         from ..geo.forma import forma_do_terreno
 
         area_ref = (r.unidade_autonoma or {}).get("area_terreno_condominio_m2") or r.area_declarada_m2
-        r.forma = forma_do_terreno([asdict(m) for m in r.medidas], area_ref, [(a, d) for a, d, _, _ in lances] if len(lances) >= 3 else None)
+        r.forma = None
+        if len(cardeais) >= 3:
+            from ..geo.forma import forma_por_rumos_com_curva
+
+            r.forma = forma_por_rumos_com_curva(cardeais, area_ref)
+            if r.forma and area_ref and abs(r.forma["area_m2"] - area_ref) / area_ref > 0.15:
+                r.alertas.append("O memorial (rumos, distâncias e curva) foi lido, mas a forma montada não confere com a área da matrícula: "
+                                 "pode faltar um trecho na leitura. Confira as medidas no documento original.")
+                r.forma = None
+            if r.forma:
+                r.area_calculada_m2, r.perimetro_m = r.forma["area_m2"], r.forma["perimetro_m"]
+        if not r.forma:
+            r.forma = forma_do_terreno([asdict(m) for m in r.medidas], area_ref, [(a, d) for a, d, _, _ in lances] if len(lances) >= 3 else None)
 
     if r.vertices and len(r.vertices) >= 3 and r.fechamento is None:
         r.fechamento = {**asdict(avaliar_fechamento(0, r.perimetro_m or 0)), "precisao_txt": "polígono por coordenadas"}

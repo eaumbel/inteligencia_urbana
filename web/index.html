@@ -826,8 +826,12 @@ function renderMatricula(r) {
   if (r.geojson) {
     desenharCroqui(r, camadaMat);
     const g = L.geoJSON(r.geojson, { style: { color: corMapa(), weight: 3, fillOpacity: .15 } }).addTo(camadaMat);
-    r.geojson.geometry.coordinates[0].slice(0, -1).forEach((c, i) => L.circleMarker([c[1], c[0]], { radius: 4, color: "#fff", fillColor: corMapa(), fillOpacity: 1 })
-      .bindTooltip(r.vertices[i]?.nome || "").addTo(camadaMat));
+    const cs = r.geojson.geometry.coordinates[0].slice(0, -1), ladoM = i => distanciaM(L.latLng(cs[i][1], cs[i][0]), L.latLng(cs[(i + 1) % cs.length][1], cs[(i + 1) % cs.length][0]));
+    const lados = cs.map((_, i) => ladoM(i)), curto = Math.max(1, 0.06 * Math.max(...lados));
+    cs.forEach((c, i) => {  // pontos internos de um trecho em curva não recebem marcador
+      if (lados[i] < curto && lados[(i - 1 + cs.length) % cs.length] < curto) return;
+      L.circleMarker([c[1], c[0]], { radius: 4, color: "#fff", fillColor: corMapa(), fillOpacity: 1 }).bindTooltip(r.vertices[i]?.nome || "").addTo(camadaMat);
+    });
     mapa.fitBounds(g.getBounds(), { padding: [40, 40], maxZoom: 19 });
     desenharMedidas(r.geojson.geometry.coordinates[0].slice(0, -1).map(c => [c[1], c[0]]), r.area_calculada_m2, camadaMat,
       r.segmentos.length === r.vertices.length ? r.segmentos.map(sg => sg.distancia_m) : null);
@@ -852,13 +856,23 @@ function renderMatricula(r) {
 // ---------- medidas no mapa (comprimento de cada lado e área)
 function distanciaM(a, b) { return mapa.distance(a, b); }
 function desenharMedidas(pts, area, camada, comprimentos = null) {
-  pts.forEach((p, i) => {
-    const q = pts[(i + 1) % pts.length];
-    if (pts.length < 3 && i === pts.length - 1) return;
-    const meio = L.latLng((p.lat ?? p[0]) / 2 + (q.lat ?? q[0]) / 2, (p.lng ?? p[1]) / 2 + (q.lng ?? q[1]) / 2);
-    L.tooltip({ permanent: true, direction: "center", className: "medida" }).setLatLng(meio)
-      .setContent(`${fmt(comprimentos?.[i] ?? distanciaM(L.latLng(p), L.latLng(q)))} m`).addTo(camada);
-  });
+  const n = pts.length < 3 ? pts.length - 1 : pts.length, ll = p => L.latLng(p.lat ?? p[0], p.lng ?? p[1]);
+  const comp = Array.from({ length: n }, (_, i) => comprimentos?.[i] ?? distanciaM(ll(pts[i]), ll(pts[(i + 1) % pts.length])));
+  // trechos em curva chegam como muitos lados curtos seguidos: um rótulo só, com o comprimento total da curva
+  const curto = Math.max(1, 0.06 * Math.max(...comp, 0));
+  const rotulo = (a, b, txt) => L.tooltip({ permanent: true, direction: "center", className: "medida" })
+    .setLatLng(L.latLng((a.lat + b.lat) / 2, (a.lng + b.lng) / 2)).setContent(txt).addTo(camada);
+  for (let i = 0; i < n;) {
+    let j = i;
+    while (j < n && comp[j] < curto) j++;
+    if (j - i >= 3) {
+      const meio = Math.floor((i + j) / 2), total = comp.slice(i, j).reduce((s, v) => s + v, 0);
+      rotulo(ll(pts[meio]), ll(pts[meio]), `curva ${fmt(total)} m`);
+      i = j; continue;
+    }
+    rotulo(ll(pts[i]), ll(pts[(i + 1) % pts.length]), `${fmt(comp[i])} m`);
+    i++;
+  }
   if (area && pts.length >= 3) {
     const centro = L.polygon(pts).getBounds().getCenter();
     L.tooltip({ permanent: true, direction: "center", className: "medida medida-area", offset: [0, -26] }).setLatLng(centro).setContent(`${fmt(area)} m²`).addTo(camada);

@@ -10,6 +10,8 @@ Casos:
 2. Frente / fundos / laterais → quadrilátero com a lateral esquerda perpendicular à
    frente; a lateral direita é ajustada para fechar com os fundos informados.
 3. Só a área → quadrado de mesma área (forma real desconhecida).
+4. Rumos por direção ("S - N - 100,00 metros", "W - E") com um trecho em curva de comprimento conhecido
+   ("curva de 100,26 metros"): forma exata; o lado para onde a curva se volta é o que reproduz a área declarada.
 """
 
 from __future__ import annotations
@@ -115,3 +117,90 @@ def forma_do_terreno(medidas: list[dict], area_declarada: float | None = None,
                       .replace(",", "X").replace(".", ",").replace("X", "."))
     return {"pontos_m": [[round(x, 3), round(y, 3)] for x, y in pts], "orientacao": "rua", "fonte": fonte,
             "area_m2": round(area, 2), "dimensoes": d, "avisos": avisos}
+
+
+def _raio_do_arco(s: float, c: float) -> float | None:
+    """Raio R tal que um arco de comprimento s tenha corda c (2R·sen(s/2R) = c). None se s ≤ c (reta)."""
+    if s <= c * 1.0000001 or c <= 0:
+        return None
+    lo, hi = s / (2 * math.pi) + 1e-9, 1e9  # arco menor que uma volta
+    lo = max(lo, s / math.pi * 0.5)  # θ ≤ 2π
+    for _ in range(200):
+        m = (lo + hi) / 2
+        if 2 * m * math.sin(s / (2 * m)) > c:
+            hi = m
+        else:
+            lo = m
+    return (lo + hi) / 2
+
+
+def _br(v: float, casas: int = 2) -> str:
+    return f"{v:,.{casas}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _pontos_do_arco(a, b, R: float, lado: int, n: int = 48) -> list[tuple[float, float]]:
+    """Pontos internos do arco menor de A até B, com raio R, abaulado para o lado (+1 esquerda / -1 direita de A→B)."""
+    (ax, ay), (bx, by) = a, b
+    c = math.dist(a, b)
+    mx, my = (ax + bx) / 2, (ay + by) / 2
+    nx, ny = -(by - ay) / c, (bx - ax) / c  # normal à esquerda de A→B
+    dc = math.sqrt(max(R * R - (c / 2) ** 2, 0))
+    cx, cy = mx - lado * nx * dc, my - lado * ny * dc  # centro do lado oposto ao abaulamento
+    ta, tb = math.atan2(ay - cy, ax - cx), math.atan2(by - cy, bx - cx)
+    dt = (tb - ta + math.pi) % (2 * math.pi) - math.pi  # arco menor
+    return [(cx + R * math.cos(ta + dt * k / n), cy + R * math.sin(ta + dt * k / n)) for k in range(1, n)]
+
+
+def forma_por_rumos_com_curva(itens: list[dict], area_declarada: float | None = None) -> dict | None:
+    """itens na ordem do memorial: {"tipo": "reta", "az": graus, "d": m} ou {"tipo": "curva", "s": m, "raio": m|None}.
+
+    Exatamente um trecho em curva: os trechos retos antes dela partem da origem e os de depois chegam de volta à
+    origem; a curva liga as duas pontas. Sem raio informado, o raio sai do comprimento da curva e da corda, e o lado
+    para onde ela se volta é escolhido pela área declarada (quando houver).
+    """
+    curvas = [i for i, it in enumerate(itens) if it["tipo"] == "curva"]
+    if len(curvas) != 1 or len(itens) < 3:
+        return None
+    k = curvas[0]
+    vet = lambda it: (it["d"] * math.sin(math.radians(it["az"])), it["d"] * math.cos(math.radians(it["az"])))
+    antes = [(0.0, 0.0)]
+    for it in itens[:k]:
+        dx, dy = vet(it); antes.append((antes[-1][0] + dx, antes[-1][1] + dy))
+    depois = [(0.0, 0.0)]  # caminha de trás para a frente a partir da origem
+    for it in reversed(itens[k + 1:]):
+        dx, dy = vet(it); depois.append((depois[-1][0] - dx, depois[-1][1] - dy))
+    depois = list(reversed(depois))  # depois[0] = fim da curva, depois[-1] = origem
+    A, B = antes[-1], depois[0]
+    c, s = math.dist(A, B), itens[k]["s"]
+    avisos, perimetro = [], sum(it.get("d") or it.get("s") for it in itens)
+    R = itens[k].get("raio") or _raio_do_arco(s, c)
+    if R and R < c / 2:
+        R = None
+    candidatos = []
+    if R:
+        for lado in (1, -1):
+            pts = antes + _pontos_do_arco(A, B, R, lado) + depois[:-1]
+            candidatos.append((lado, pts, _area(pts)))
+    reta = antes + depois[:-1]
+    if not candidatos:
+        avisos.append(f"O trecho em curva ({_br(s)} m) não é maior que a distância reta entre suas pontas ({_br(c)} m): "
+                      "a curva foi desenhada como reta.")
+        pts, area, lado_txt = reta, _area(reta), None
+    elif area_declarada:
+        lado, pts, area = min(candidatos, key=lambda x: abs(x[2] - area_declarada))
+        outro = [x for x in candidatos if x[0] != lado][0]
+        lado_txt = "para dentro" if area < _area(reta) else "para fora"
+        avisos.append(f"A matrícula não diz para que lado a curva se volta nem o raio. Raio calculado de {_br(R, 1)} m pelo comprimento "
+                      f"da curva ({_br(s)} m) e pela distância entre suas pontas ({_br(c)} m); a curva foi desenhada {lado_txt} do terreno, "
+                      f"o lado que reproduz a área da matrícula (o outro lado daria {_br(outro[2])} m²).")
+    else:
+        pts, area, lado_txt = reta, _area(reta), None
+        avisos.append("Sem área declarada para decidir o lado da curva: o trecho em curva foi desenhado como reta.")
+    if area_declarada and abs(area - area_declarada) / area_declarada > 0.02:
+        avisos.append(f"Área da forma montada ({_br(area)} m²) difere da área da matrícula ({_br(area_declarada)} m²).")
+    avisos.append("Os rumos estão só como direção (S–N, W–E etc.), sem graus: a forma considera ângulos exatos entre os lados.")
+    return {"pontos_m": [[round(x, 3), round(y, 3)] for x, y in pts], "orientacao": "fixa",
+            "fonte": "rumos e distâncias da matrícula, com trecho em curva", "area_m2": round(area, 2),
+            "perimetro_m": round(perimetro, 2), "curva": {"comprimento_m": s, "corda_m": round(c, 3), "raio_m": round(R, 1) if R else None,
+                                                         "lado": lado_txt},
+            "avisos": avisos}
